@@ -1,4 +1,3 @@
-require('quaternionLibrary')
 -- Time variables
 local previousTime = client:getSystemTime() -- Milliseconds
 local currentTime = client:getSystemTime() -- Milliseconds
