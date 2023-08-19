@@ -1,0 +1,7 @@
+- rotation limits
+- colliders
+- ability to change limits live
+- quarternions and roll physics
+- flexibility adjuster (go to origonal pos)
+- gravity adjuster
+- air resistance adjuster
