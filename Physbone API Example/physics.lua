@@ -16,6 +16,21 @@ function getPos(ID)
     return physBone[ID].path:partToWorldMatrix():apply()
 end
 
+function find_perpendicular_direction_vector(direction)
+    -- Normalize the direction vector.
+    direction = direction:normalize()
+  
+    -- Calculate the cross product of the direction vector and the z-axis.
+    perpendicular_direction_vector = direction:cross(vec(0, 0, 1))
+  
+    -- If the perpendicular direction vector is the zero vector, then return the negative z-axis.
+    if perpendicular_direction_vector == vec(0, 0, 0) then
+      return vec(0, 0, -1)
+    else
+        return perpendicular_direction_vector
+    end
+end
+
 function events.entity_init()
     -- Pendulum object initialization
     physBone = {}
@@ -40,12 +55,6 @@ function events.entity_init()
         end
     end
     findCustomParentTypes(models)
-      
-    
-  --[[   pendulum = {
-        position = getPosition(),
-        previousPosition = getPosition()
-    } ]]
 end
 
 function events.tick()
@@ -70,19 +79,15 @@ function events.tick()
         local direction = physBone[k].pos - pendulumBase
         physBone[k].pos = pendulumBase + direction:normalized()
 
+        local rotVec = find_perpendicular_direction_vector(direction)
+
         -- Rotation Calcualtion
         local relativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(pendulumBase + (physBone[k].pos - pendulumBase)):normalize()
-        
-        relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
-        yaw = math.deg(math.atan2(relativeVec.x,relativeVec.z))
-        pitch = math.deg(math.asin(-relativeVec.y))
-        physBone[k].rot = math.lerp(physBone[k].path['physChild'..k]:getRot(),vec(pitch,0,yaw),0.5)
-    end
-end
-
-function events.render(delta)
-    for k,v in pairs(physBone) do
-        local path = physBone[k].path['physChild'..k]
-        path:setRot(math.lerp(path:getRot(),physBone[k].rot,delta))
+        for i = 0, 1, 1/16 do
+            local currentPos = pendulumBase + (physBone[k].pos - pendulumBase) * i
+            particles['dust 1 1 1 1']:pos(currentPos):setLifetime(1):scale(1/5):spawn()
+            local rotVec = physBone[k].pos + rotVec  * i/10
+            particles['dust 1 1 1 1']:pos(rotVec):setLifetime(1):scale(1/5):spawn()
+        end
     end
 end
