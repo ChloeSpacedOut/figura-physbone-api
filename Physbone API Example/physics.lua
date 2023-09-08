@@ -12,18 +12,20 @@ function updateTime()
 	previousTime = currentTime
 end
 
-function find_perpendicular_direction_vector(direction)
+function find_perpendicular_direction_vector(direction,playerRot)
 	-- Normalize the direction vector.
 	direction = direction:normalize()
 
+	local rotVector = vectors.angleToDir(0,playerRot-90)
+
 	-- Calculate the cross product of the direction vector and the z-axis.
-	perpendicular_direction_vector = direction:cross(vec(0, 0, 1))
+	perpendicular_direction_vector = direction:cross(vec(rotVector.x, 0, rotVector.z))
 
 	-- If the perpendicular direction vector is the zero vector, then return the negative z-axis.
 	if perpendicular_direction_vector == vec(0, 0, 0) then
-		return vec(0, 0, -1)
+		return vec(-1, 0, 0)
 	else
-			return perpendicular_direction_vector
+		return perpendicular_direction_vector
 	end
 end
 
@@ -78,9 +80,8 @@ function events.tick()
 
 		local direction = physBone[k].pos - pendulumBase
 		physBone[k].pos = pendulumBase + direction:normalized()
-		local rotVec = find_perpendicular_direction_vector(direction)
-		-- !!!!!!!!!!!!! ----------- NOTE: system to use getRot() or getBodyYaw() will be needed .. unfortunately ----------!!!!!!!!!!!!!!!!!!
-		rotVec = vectors.rotateAroundAxis(player:getRot().y-90,rotVec,vec(0,-1,0)):normalized()
+		local playerRot = player:getRot().y -- note that a system to choose between player rot and body yaw will be needed. Maybe a custom orientation dir option too
+		local rotVec = find_perpendicular_direction_vector(direction,playerRot)
 		local rotVec2 = (physBone[k].path['PYC'..k]:partToWorldMatrix()):invert():apply(pendulumBase + rotVec):normalize()
 		physBone[k].path['PYC'..k]['RC'..k]:setRot(0,-math.deg(math.atan(rotVec2.z,rotVec2.x)),0)
 		-- Rotation Calcualtion
