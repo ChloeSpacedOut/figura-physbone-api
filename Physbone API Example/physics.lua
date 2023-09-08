@@ -90,7 +90,7 @@ function events.tick()
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		yaw = math.deg(math.atan2(relativeVec.x,relativeVec.z))
 		pitch = math.deg(math.asin(-relativeVec.y))
-		physBone[k].rot = math.lerp(physBone[k].path['PYC'..k]:getRot(),vec(pitch,0,yaw),0.5)
+		physBone[k].rot = vec(pitch,0,yaw)
 		--- debug ----
 		for i = 0, 1, 1/16 do
 			local currentPos = pendulumBase + (physBone[k].pos - pendulumBase) * i
