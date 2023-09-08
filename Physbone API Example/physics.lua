@@ -80,10 +80,7 @@ function events.tick()
 
 		local direction = physBone[k].pos - pendulumBase
 		physBone[k].pos = pendulumBase + direction:normalized()
-		local playerRot = player:getRot().y -- note that a system to choose between player rot and body yaw will be needed. Maybe a custom orientation dir option too
-		local rotVec = find_perpendicular_direction_vector(direction,playerRot)
-		local rotVec2 = (physBone[k].path['PYC'..k]:partToWorldMatrix()):invert():apply(pendulumBase + rotVec):normalize()
-		physBone[k].path['PYC'..k]['RC'..k]:setRot(0,-math.deg(math.atan(rotVec2.z,rotVec2.x)),0)
+		
 		-- Rotation Calcualtion
 		local relativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(pendulumBase + (physBone[k].pos - pendulumBase)):normalize()
 		
@@ -95,17 +92,27 @@ function events.tick()
 		for i = 0, 1, 1/16 do
 			local currentPos = pendulumBase + (physBone[k].pos - pendulumBase) * i
 			particles['dust 1 0 0 1']:pos(currentPos):setLifetime(1):scale(1/5):spawn()
-			local rotVec = physBone[k].pos + rotVec  * i/5
-			particles['dust 0 0 1 1']:pos(rotVec):setLifetime(1):scale(1/5):spawn()
+--[[ 			local rotVec = physBone[k].pos + rotVec  * i/5
+			particles['dust 0 0 1 1']:pos(rotVec):setLifetime(1):scale(1/5):spawn() ]]
 		end
 		------------------
 	end
 end
 
 function events.render(delta)
+	local playerRot = player:getRot().y -- note that a system to choose between player rot and body yaw will be needed. Maybe a custom orientation dir option too
+	
 	for k,v in pairs(physBone) do
+		
+		local pendulumBase = getPos(k)
+		local direction = physBone[k].pos - pendulumBase
+		local rotVec = find_perpendicular_direction_vector(direction,playerRot)
+		local rotVec2 = (physBone[k].path['PYC'..k]:partToWorldMatrix()):invert():apply(pendulumBase + rotVec):normalize()
+		physBone[k].path['PYC'..k]['RC'..k]:setRot(0,-math.deg(math.atan(rotVec2.z,rotVec2.x)),0)
+
 		local path = physBone[k].path['PYC'..k]
-		path:setRot(math.lerp(path:getRot(),physBone[k].rot,delta))
+		--path:setRot(math.lerp(path:getRot(),physBone[k].rot,delta))
+		path:setRot(physBone[k].rot)
 		
 
 	end
