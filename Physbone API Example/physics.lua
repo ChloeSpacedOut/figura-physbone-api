@@ -1,3 +1,5 @@
+physBone = {}
+
 -- Time variables
 local previousTime = client:getSystemTime() -- Milliseconds
 local currentTime = client:getSystemTime() -- Milliseconds
@@ -12,38 +14,65 @@ function updateTime()
 	previousTime = currentTime
 end
 
-function find_perpendicular_direction_vector(direction,playerRot)
-	-- Normalize the direction vector.
-	direction = direction:normalize()
-
-	local rotVector = vectors.angleToDir(0,playerRot-90)
-
-	-- Calculate the cross product of the direction vector and the z-axis.
-	perpendicular_direction_vector = direction:cross(vec(rotVector.x, 0, rotVector.z))
-
-	-- If the perpendicular direction vector is the zero vector, then return the negative z-axis.
-	if perpendicular_direction_vector == vec(0, 0, 0) then
-		return vec(-1, 0, 0)
-	else
-		return perpendicular_direction_vector
-	end
-end
-
 function getPos(ID)
 	return physBone[ID].path:partToWorldMatrix():apply()
 end
 
 function events.entity_init()
 	-- Pendulum object initialization
-	physBone = {}
 	function findCustomParentTypes(path)
 		for k,v in pairs(path:getChildren()) do
 			local name = v:getName()
 			if string.find(name,'physBone',0) and not (string.find(name,'PYC',0) or string.find(name,'RC',0))  then
 				physBone[name] = {
 					path = v,
-					pos = v:partToWorldMatrix():apply(),
-					lastPos = v:partToWorldMatrix():apply()
+					pos 	= v:partToWorldMatrix():apply(),
+					lastPos = v:partToWorldMatrix():apply(),
+					gravity = -9.81,
+					setGravity =	
+						function(self,data)
+							self.gravity = data
+						end,
+					getGravity =	
+						function(self)
+							return self.gravity						
+						end,
+					airResistance = 0.15,
+					setAirResistance =	
+						function(self,data)
+							self.airResistance = data
+						end,
+					getAirResistance =	
+						function(self)
+							return self.airResistance						
+						end,
+					simSpeed = 1,
+					setSimSpeed =	
+						function(self,data)
+							self.simSpeed = data
+						end,
+					getSimSpeed =	
+						function(self)
+							return self.simSpeed						
+						end,
+					equilibrium = vec(0,1,0),
+					setEquilibrium =	
+						function(self,data)
+							self.quilibrium = data
+						end,
+					getEquilibrium =	
+						function(self)
+							return self.quilibrium						
+						end,
+					springForce = 0,
+					setSpringForce =	
+						function(self,data)
+							self.springForce = data
+						end,
+					getSpringForce =	
+						function(self)
+							return self.springForce						
+						end
 				}
 				v:newPart('PYC'..name)
 				v['PYC'..name]:newPart('RC'..name)
@@ -67,18 +96,23 @@ function events.tick()
 	local deltaTimeInSeconds = deltaTime / 1000 -- Delta Time in seconds
 
 	for k,v in pairs(physBone) do
-
 		-- Pendulum logic
 		local pendulumBase = getPos(k)
-		local velocity = physBone[k].pos - physBone[k].lastPos
+		local velocity = (physBone[k].pos - physBone[k].lastPos)
 
 		-- Air Resistance
-		local airResistanceFactor = 0.1 -- Adjust this value to control the strength of air resistance
+		local airResistanceFactor = physBone[k].airResistance -- Adjust this value to control the strength of air resistance
 		local airResistance = velocity * (-airResistanceFactor)
 		velocity = velocity + airResistance
+		
+		-- Spring force
+		local springForce = physBone[k].equilibrium:normalized() * (-physBone[k].springForce)
+		velocity = velocity + springForce
 
+		-- Finalise Physics
 		physBone[k].lastPos = physBone[k].pos:copy()
-		physBone[k].pos = physBone[k].pos + velocity + vec(0, -10* (deltaTimeInSeconds^2), 0)
+		physBone[k].pos = physBone[k].pos + velocity + vec(0, physBone[k].gravity * ((deltaTimeInSeconds*1.3*physBone[k].simSpeed)^2), 0)
+		-- NOTE!!! air resistance & spring force aren't effected by sim speed. Fix this!
 
 		local direction = physBone[k].pos - pendulumBase
 		physBone[k].pos = pendulumBase + direction:normalized()
@@ -90,12 +124,6 @@ function events.tick()
 		yaw = math.deg(math.atan2(relativeVec.x,relativeVec.z))
 		pitch = math.deg(math.asin(-relativeVec.y))
 		physBone[k].rot = vec(pitch,0,yaw)
---[[ 		--- debug ----
-		for i = 0, 1, 1/16 do
-			local currentPos = pendulumBase + (physBone[k].pos - pendulumBase) * i
-			particles['dust 1 0 0 1']:pos(currentPos):setLifetime(1):scale(1/5):spawn()
-		end
-		------------------ ]]
 	end
 end
 
@@ -105,3 +133,4 @@ function events.render(delta)
 		path:setRot(math.lerp(path:getRot(),physBone[k].rot,delta))
 	end
 end
+
