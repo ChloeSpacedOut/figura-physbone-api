@@ -7,20 +7,20 @@ local deltaTime = 0  -- Milliseconds
 local elapsedTime = 0 -- Milliseconds
 
 
-function updateTime()
+local function updateTime()
 	currentTime = client:getSystemTime()
 	deltaTime = currentTime - previousTime
 	elapsedTime = elapsedTime + deltaTime
 	previousTime = currentTime
 end
 
-function getPos(ID)
+local function getPos(ID)
 	return physBone[ID].path:partToWorldMatrix():apply()
 end
 
 function events.entity_init()
 	-- Pendulum object initialization
-	function findCustomParentTypes(path)
+	local function findCustomParentTypes(path)
 		for k,v in pairs(path:getChildren()) do
 			local name = v:getName()
 			if string.find(name,'physBone',0) and not (string.find(name,'PYC',0) or string.find(name,'RC',0))  then
@@ -63,8 +63,7 @@ function events.entity_init()
 						end,
 					getEquilibrium =	
 						function(self)
-							return self.equilibrium
-													
+							return self.equilibrium						
 						end,
 					springForce = 0,
 					setSpringForce =	
