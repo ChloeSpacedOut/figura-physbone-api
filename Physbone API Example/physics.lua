@@ -25,6 +25,7 @@ function events.entity_init()
 			local name = v:getName()
 			if string.find(name,'physBone',0) and not (string.find(name,'PYC',0) or string.find(name,'RC',0))  then
 				physBone[name] = {
+					ID = name,
 					path = v,
 					pos 	= v:partToWorldMatrix():apply(),
 					lastPos = v:partToWorldMatrix():apply(),
@@ -58,11 +59,12 @@ function events.entity_init()
 					equilibrium = vec(0,1,0),
 					setEquilibrium =	
 						function(self,data)
-							self.quilibrium = data
+							self.equilibrium = data
 						end,
 					getEquilibrium =	
 						function(self)
-							return self.quilibrium						
+							return self.equilibrium
+													
 						end,
 					springForce = 0,
 					setSpringForce =	
