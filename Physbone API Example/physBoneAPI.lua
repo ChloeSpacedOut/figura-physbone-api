@@ -1,3 +1,4 @@
+-- By ChloeSpacedOut <3
 physBone = {}
 
 -- Time variables
@@ -134,4 +135,3 @@ function events.render(delta)
 		path:setRot(math.lerp(path:getRot(),physBone[k].rot,delta))
 	end
 end
-
