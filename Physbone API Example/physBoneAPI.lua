@@ -1,5 +1,6 @@
 -- By ChloeSpacedOut <3
 physBone = {}
+local physBoneIndex = {}
 
 -- Time variables
 local previousTime = client:getSystemTime() -- Milliseconds
@@ -20,11 +21,14 @@ local function getPos(ID)
 end
 
 function events.entity_init()
+	local boneID = 0
 	-- Pendulum object initialization
 	local function findCustomParentTypes(path)
 		for k,v in pairs(path:getChildren()) do
 			local name = v:getName()
 			if string.find(name,'physBone',0) and not (string.find(name,'PYC',0) or string.find(name,'RC',0))  then
+				boneID = boneID + 1
+				physBoneIndex[boneID] = name
 				physBone[name] = {
 					ID = name,
 					path = v,
@@ -97,10 +101,11 @@ function events.tick()
 	updateTime()
 	local deltaTimeInSeconds = deltaTime / 1000 -- Delta Time in seconds
 
-	for k,v in pairs(physBone) do
+	for key,v in ipairs(physBoneIndex) do
+		local k = v	
 		-- Pendulum logic
 		local pendulumBase = getPos(k)
-		local velocity = (physBone[k].pos - physBone[k].lastPos)
+		local velocity = (physBone[k].pos - physBone[k].lastPos)	
 
 		-- Air Resistance
 		local airResistanceFactor = physBone[k].airResistance -- Adjust this value to control the strength of air resistance
