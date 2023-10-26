@@ -12,6 +12,8 @@ The physbone API requires some entity information when scanning and generating i
 
 When accessing a function with the physbone API, you'll need to enter your `partName`. This is not the path to your model part like it work in Figura's model part API. It is simply the name of your part. E.g. if your model part was `models.model.Head.physBoneHair`, you would just put `physBoneHair`. 
 
+Due to how this works, it edits the Blockbench file structure. Due to this, if you're using the default blockbench file path, you won't be able to access model parts inside any part you labled as a physbone. They will have been moved to a new location. This is inside the PYC group (pitch yaw correction group, located in your physbone group), and then inside that, in the RC group (rotation correction group). These names are also prefixes, and use the same name as your origional group name. For example, if your file path was origionally `models.model.Head.physBoneHair.bow`, it will now become `models.model.Head.physBoneHair.PYCHair.RCHair.bow`.
+
 The functions are the following:
 ### setGravity()
 Sets the strength of gravity for that physbone. Default is `-9.81`, and the value is an integer.
