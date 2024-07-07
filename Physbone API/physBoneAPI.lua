@@ -1,91 +1,93 @@
 -- By ChloeSpacedOut <3
 physBone = {}
+local physBoneIndex = {}
+local lastDelta = 0
+local lastDeltaTime,lasterDeltaTime,lastestDeltaTime = 0,0,0
 
--- Time variables
-local previousTime = client:getSystemTime() -- Milliseconds
-local currentTime = client:getSystemTime() -- Milliseconds
-local deltaTime = 0  -- Milliseconds
-local elapsedTime = 0 -- Milliseconds
-
-
-local function updateTime()
-	currentTime = client:getSystemTime()
-	deltaTime = currentTime - previousTime
-	elapsedTime = elapsedTime + deltaTime
-	previousTime = currentTime
-end
-
-local function getPos(ID)
-	return physBone[ID].path:partToWorldMatrix():apply()
+function newPhysBone(v,upsideDown,gravity,airResistance,simSpeed,equilibrium,springForce)
+	local ID = v:getName()
+	return {
+		ID = ID,
+		path = v,
+		pos = v:partToWorldMatrix():apply(),
+		lastPos = v:partToWorldMatrix():apply(),
+		upsideDown = upsideDown,
+		setUpsideDown =	
+			function(self,data)
+				self.upsideDown = data
+			end,
+		getUpsideDown =	
+			function(self)
+				return self.upsideDown						
+			end,
+		gravity = gravity,
+		setGravity =	
+			function(self,data)
+				self.gravity = data
+			end,
+		getGravity =	
+			function(self)
+				return self.gravity						
+			end,
+		airResistance = airResistance,
+		setAirResistance =	
+			function(self,data)
+				self.airResistance = data
+			end,
+		getAirResistance =	
+			function(self)
+				return self.airResistance						
+			end,
+		simSpeed = simSpeed,
+		setSimSpeed =	
+			function(self,data)
+				self.simSpeed = data
+			end,
+		getSimSpeed =	
+			function(self)
+				return self.simSpeed						
+			end,
+		equilibrium = equilibrium,
+		setEquilibrium =	
+			function(self,data)
+				self.equilibrium = data
+			end,
+		getEquilibrium =	
+			function(self)
+				return self.equilibrium						
+			end,
+		springForce = springForce,
+		setSpringForce =	
+			function(self,data)
+				self.springForce = data
+			end,
+		getSpringForce =	
+			function(self)
+				return self.springForce						
+			end
+	}
 end
 
 function events.entity_init()
+	local boneID = 0
 	-- Pendulum object initialization
 	local function findCustomParentTypes(path)
 		for k,v in pairs(path:getChildren()) do
-			local name = v:getName()
-			if string.find(name,'physBone',0) and not (string.find(name,'PYC',0) or string.find(name,'RC',0))  then
-				physBone[name] = {
-					ID = name,
-					path = v,
-					pos 	= v:partToWorldMatrix():apply(),
-					lastPos = v:partToWorldMatrix():apply(),
-					gravity = -9.81,
-					setGravity =	
-						function(self,data)
-							self.gravity = data
-						end,
-					getGravity =	
-						function(self)
-							return self.gravity						
-						end,
-					airResistance = 0.15,
-					setAirResistance =	
-						function(self,data)
-							self.airResistance = data
-						end,
-					getAirResistance =	
-						function(self)
-							return self.airResistance						
-						end,
-					simSpeed = 1,
-					setSimSpeed =	
-						function(self,data)
-							self.simSpeed = data
-						end,
-					getSimSpeed =	
-						function(self)
-							return self.simSpeed						
-						end,
-					equilibrium = vec(0,1,0),
-					setEquilibrium =	
-						function(self,data)
-							self.equilibrium = data
-						end,
-					getEquilibrium =	
-						function(self)
-							return self.equilibrium						
-						end,
-					springForce = 0,
-					setSpringForce =	
-						function(self,data)
-							self.springForce = data
-						end,
-					getSpringForce =	
-						function(self)
-							return self.springForce						
-						end
-				}
-				v:newPart('PYC'..name)
-				v['PYC'..name]:newPart('RC'..name)
-				for i,j in pairs(v:getChildren()) do
-					if j:getName() ~= 'PYC'..name then
-						v['PYC'..name]['RC'..name]:addChild(j)
-						v:removeChild(j)
-					end
+			local ID = v:getName()
+			local isBone = string.find(ID,'physBone',0)
+			local isBoob = string.find(ID,'physBoob',0)
+			local isEar = string.find(ID,'physEar',0)
+			if isBone or isBoob or isEar then
+				boneID = boneID + 1
+				physBoneIndex[boneID] = ID
+				if isBone then
+					physBone[ID] = newPhysBone(v,false,-9.81,0.1,1,vec(0,0),0)
+				elseif isBoob then
+					physBone[ID] = newPhysBone(v,false,-9.81,0.2,2,vec(0,0),70)
+				elseif isEar then
+					physBone[ID] = newPhysBone(v,true,-9.81,0.3,2,vec(90,0),30)
 				end
-				physBone[name].path:setRot(0,90,0)
-				physBone[name].path['PYC'..name]['RC'..name]:setRot(0,-90,0)
+				physBone[ID].path:setRot(0,90,0)
 			end
 			findCustomParentTypes(v)
 		end
@@ -93,45 +95,86 @@ function events.entity_init()
 	findCustomParentTypes(models)
 end
 
+-- Simple Clock
+local physClock = 0
 function events.tick()
-	updateTime()
-	local deltaTimeInSeconds = deltaTime / 1000 -- Delta Time in seconds
+	physClock = physClock + 1
+end
 
-	for k,v in pairs(physBone) do
+-- Render Function Chooser
+local renderFunction
+if host:isHost() then
+	renderFunction = "world_render"
+else
+	renderFunction = "render"
+end
+
+events[renderFunction] = function (delta)
+	-- Time Calculations
+	deltaTime = (physClock + delta) - lastDelta
+  lastDelta = (physClock + delta)
+
+	for _,ID in ipairs(physBoneIndex) do
 		-- Pendulum logic
-		local pendulumBase = getPos(k)
-		local velocity = (physBone[k].pos - physBone[k].lastPos)
+		local pendulumBase = physBone[ID].path:partToWorldMatrix():apply()
+		local velocity
+    if lastestDeltaTime == 0 then
+        velocity = 0
+    else
+        velocity = (physBone[ID].pos - physBone[ID].lastPos) / lastestDeltaTime / (physBone[ID].simSpeed/100)
+    end
+
+		-- Set UpsideDown Mod (for when physbones have their pivot at the bottom)
+		local upsideDownMod = 1
+		if physBone[ID].upsideDown then
+			upsideDownMod = -1
+		end
 
 		-- Air Resistance
-		local airResistanceFactor = physBone[k].airResistance -- Adjust this value to control the strength of air resistance
+		local airResistanceFactor = physBone[ID].airResistance
 		local airResistance = velocity * (-airResistanceFactor)
-		velocity = velocity + airResistance
+		velocity = velocity + airResistance * lasterDeltaTime
 		
 		-- Spring force
-		local springForce = physBone[k].equilibrium:normalized() * (-physBone[k].springForce)
-		velocity = velocity + springForce
+		local equalib = physBone[ID].equilibrium
+		local relativeDirMat = physBone[ID].path:getParent():partToWorldMatrix():copy() * matrices.mat4():rotate(equalib.x*upsideDownMod,equalib.y*upsideDownMod)
+		local reliveDir = relativeDirMat:applyDir(0,0,-1):normalized()
+		local springForce = reliveDir * physBone[ID].springForce
+		velocity = velocity + springForce * lasterDeltaTime
+
+		-- Gravity
+		velocity = velocity + vec(0, physBone[ID].gravity,0) * lasterDeltaTime * upsideDownMod
 
 		-- Finalise Physics
-		physBone[k].lastPos = physBone[k].pos:copy()
-		physBone[k].pos = physBone[k].pos + velocity + vec(0, physBone[k].gravity * ((deltaTimeInSeconds*1.3*physBone[k].simSpeed)^2), 0)
-		-- NOTE!!! air resistance & spring force aren't effected by sim speed. Fix this!
-
-		local direction = physBone[k].pos - pendulumBase
-		physBone[k].pos = pendulumBase + direction:normalized()
+		physBone[ID].lastPos = physBone[ID].pos:copy()
+		local direction = (physBone[ID].pos + velocity * lasterDeltaTime * (physBone[ID].simSpeed/100)) - pendulumBase
+		physBone[ID].pos = pendulumBase + direction:normalized()
 
 		-- Rotation Calcualtion
-		local relativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(pendulumBase + (physBone[k].pos - pendulumBase)):normalize()
-		
+		local relativeVec = (physBone[ID].path:partToWorldMatrix()):invert():apply(pendulumBase + (physBone[ID].pos - pendulumBase)):normalize()
+		relativeVec = vec(relativeVec.x*upsideDownMod,relativeVec.y,relativeVec.z*upsideDownMod)
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		yaw = math.deg(math.atan2(relativeVec.x,relativeVec.z))
 		pitch = math.deg(math.asin(-relativeVec.y))
-		physBone[k].rot = vec(pitch,0,yaw)
-	end
-end
 
-function events.render(delta)
-	for k,v in pairs(physBone) do
-		local path = physBone[k].path['PYC'..k]
-		path:setRot(math.lerp(path:getRot(),physBone[k].rot,delta))
+		-- Transform Matrix
+		local parentPivot = physBone[ID].path:getPivot()
+		for _,part in pairs(physBone[ID].path:getChildren()) do
+			local pivot = part:getPivot()
+			local mat = matrices.mat4()
+			local rot = part:getRot()
+
+			mat:translate(-pivot)
+			mat:rotate(rot.x,rot.y,rot.z)
+			mat:translate(pivot)
+
+			mat:translate(-parentPivot)
+			mat:rotate(0,-90,0)
+			mat:rotate(vec(pitch,0,yaw))
+			mat:translate(parentPivot)
+
+			part:setMatrix(mat)
+		end
 	end
+	lastestDeltaTime,lasterDeltaTime,lastDeltaTime = lasterDeltaTime,lastDeltaTime,deltaTime
 end
