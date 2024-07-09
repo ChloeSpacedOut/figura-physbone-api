@@ -17,16 +17,6 @@ The physBone API requires some entity information when scanning and generating i
 When accessing a function with the physBone API, you'll need to enter your `partName`. This is not the path to your model part like it work in Figura's model part API. It is simply the name of your part. E.g. if your model part was `models.model.Head.physBoneHair`, you would just put `physBoneHair`. 
 
 The functions in the physBone API are the following:
-### setUpsideDown()
-Sets this physBone to be upsidedown, meaning the pivot is at the bottom of the model instead of the top. For normal physBones, default is `false`, and the value is a boolean.
-```lua
-physBone.partName:setUpsideDown(value)
-```
-### getUpsideDown()
-Returns if this physBone has been set to upsidedown as a boolean.
-```lua
-physBone.partName:getUpsideDown()
-```
 ### setGravity()
 Sets the strength of gravity for this physBone. For normal physBones, default is `-9.81`, and the value is an integer.
 ```lua
@@ -76,6 +66,28 @@ physBone.partName:setSpringForce(value)
 Returns the strength of the spring force for this physBone as an integer.
 ```lua
 physBone.partName:getSpringForce()
+```
+### setRotMod()
+Sets the rotation modifyer for this physBone. Useful for if your model parts don't match the physBone direction vector, but you don't want to change your blockbench model. For normal physBones, default is `vec(0,0,0)`, and the value is a vector 3.
+```lua
+physBone.partName:setRotMod(value)
+```
+### getRotMod()
+Returns the rotation modifyer for this physBone as a vector 3.
+```lua
+physBone.partName:getRotMod()
+```
+## Models API
+PhysBone also adds some new functions to the models API. They work just like normal models API functions.
+### newPhysBone()
+Creates a new physBone. Needs the physBone preset as a string. These presets can be `physBone`, `physBoob`, or `physEar`.
+```lua
+models.model.modelPart:newPhysBone(value)
+```
+### removePhysBone()
+Removes an existing physBone, and resets the rotation.
+```lua
+models.model.modelPart:removePhysBone()
 ```
 
 ## Additional Notes
