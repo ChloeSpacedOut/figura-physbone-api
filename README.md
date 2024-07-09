@@ -3,7 +3,7 @@ A cheap, easy to use, and highly customisable physics system.
 ## Installation 
 To install the physBone API, simply add `physBoneAPI.lua` into your script. Obviously if you use autoScripts in avatar.json, add it there. Require is not needed!
 ## Basic Swing Physics
-Adding basics physics is simple. Just add the `physBone` prefix to the name of the group containing your model part/s. For example, a group part named `swingingLamp` could be renamed to `physBoneSwingingLamp` or `physBone_swingLamp`. Make sure the pivot point of this group is where you want the object to swing from. It's reccomended you put the pivot at the top of your parts, though if you need it to be at the bottom, you will need to use the physBone API to set the part as upside down. It's also reccomended you only have 1 folder / model inside your physBone for best performance. Once you've set the keyword, it should have physics in game!
+Adding basics physics is simple. Just add the `physBone` prefix to the name of the group containing your model part/s. For example, a group part named `swingingLamp` could be renamed to `physBoneSwingingLamp` or `physBone_swingLamp`. Make sure the pivot point of this group is where you want the object to swing from. It's also reccomended you only have 1 folder / model inside your physBone for best performance, and you won't be able to edit the scale / pos / rotation of any immediate children of the physBone. Once you've set the keyword, it should have physics in game!
 ### Breast / Boob Physics
 There is an easy preset for breast physics. Just use the `physBoob` prefix instead of `physBone`. This is still a physBone, but will automatically be configued for breast physics.
 ### Ear Physics
