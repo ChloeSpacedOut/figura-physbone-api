@@ -1,5 +1,5 @@
 -- Physbone 2.0 pre-release By ChloeSpacedOut <3
-physBone = {}
+local physBone = {}
 local physBoneIndex = {}
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
@@ -20,8 +20,9 @@ physBone.setPreset = function(ID,gravity,airResistance,simSpeed,equilibrium,spri
 	physBonePresets[ID] = presetCache
 end
 
-physBone.removePreset = function(self)
-
+physBone.removePreset = function(ID)
+	if not physBonePresets[ID] then error('error removing preset: preset "'..ID..'" does not exist') end
+	physBonePresets[ID] = nil
 end
 
 physBone.setPreset("physBone")
@@ -55,13 +56,13 @@ function figuraMetatables.ModelPart:__index(key)
 end
 ---
 
-local function newPhysBone(v,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
-	local ID = v:getName()
+local function newPhysBone(path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
+	local ID = path:getName()
 	return {
 		ID = ID,
-		path = v,
-		pos = v:partToWorldMatrix():apply(),
-		lastPos = v:partToWorldMatrix():apply(),
+		path = path,
+		pos = path:partToWorldMatrix():apply(),
+		lastPos = path:partToWorldMatrix():apply(),
 		gravity = gravity,
 		setGravity =	
 			function(self,data)
