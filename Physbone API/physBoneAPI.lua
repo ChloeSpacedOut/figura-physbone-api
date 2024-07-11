@@ -1,46 +1,48 @@
--- By ChloeSpacedOut <3
+-- Physbone 2.0 pre-release By ChloeSpacedOut <3
 physBone = {}
 local physBoneIndex = {}
 local boneID = 0
-local lastDelta = 0
-local lastDeltaTime,lasterDeltaTime,lastestDeltaTime = 0,0,0
+local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
+local physBonePresets = {}
+
+physBone.setPreset = function(ID,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
+	local presetCache = {}
+	local references = {gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, rotMod = rotMod}
+	local fallbacks = {gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, rotMod = vec(0,0,0)}
+	for valID, fallbackVal in pairs(fallbacks) do
+		presetVal = references[valID]
+		if presetVal then
+			presetCache[valID] = presetVal
+		else
+			presetCache[valID] = fallbackVal
+		end
+	end
+	physBonePresets[ID] = presetCache
+end
+
+physBone.removePreset = function(self)
+
+end
+
+physBone.setPreset("physBone")
+physBone.setPreset("physBoob",nil,0.2,2,nil,70,vec(-90,0,0))
+physBone.setPreset("physEar",nil,0.3,2,vec(90,0),30,vec(0,180,180))
 
 --- method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
 local class_methods = {
-  newPhysbone = function(self,physBonePreset)
+  newPhysBone = function(self,physBonePreset)
 		local ID = self:getName()
-		if physBone[ID] then error('The physBone "'..ID..'" already exists, and cannot be created') end
+		if physBone[ID] then error('error making physBone: this physBone "'..ID..'" already exists') end
+		if not physBonePresets[physBonePreset] then error('error making physBone: preset "'..physBonePreset..'" does not exist') end
+		local preset = physBonePresets[physBonePreset]
+		part = self
+
 		boneID = boneID + 1
 		physBoneIndex[boneID] = ID
-		if physBonePreset == "physBone" then
-			physBone[ID] = newPhysBone(self,-9.81,0.1,1,vec(0,0),0,vec(0,0,0))
-		elseif physBonePreset == "physBoob" then
-			physBone[ID] = newPhysBone(self,-9.81,0.2,2,vec(0,0),70,vec(-90,0,0))
-		elseif physBonePreset == "physEar" then
-			physBone[ID] = newPhysBone(self,-9.81,0.3,2,vec(90,0),30,vec(0,180,180))
-		end
-		self:setRot(0,90,0)
-		return self
-  end,
-	removePhysBone = function(self)
-		local ID = self:getName()
-		if not physBone[ID] then error('The physBone "'..ID..'" could not be found') end
-		boneID = 0
-		local newIndex = {}
-		for k,v in pairs(physBoneIndex) do
-			if v ~= ID then
-				boneID = boneID + 1
-				newIndex[boneID] = v
-			end
-		end
-		physBoneIndex = newIndex
-		physBone[ID] = nil
-		self:setRot(0,0,0)
-		for k,v in pairs(self:getChildren()) do
-			v:setRot(v:getRot())
-		end
-		return self
+		physBone[ID] = newPhysBone(part,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.rotMod)
+		part:setRot(0,90,0)
+		return physBone[ID]
   end
 }
 
@@ -53,7 +55,7 @@ function figuraMetatables.ModelPart:__index(key)
 end
 ---
 
-function newPhysBone(v,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
+local function newPhysBone(v,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
 	local ID = v:getName()
 	return {
 		ID = ID,
@@ -119,6 +121,24 @@ function newPhysBone(v,gravity,airResistance,simSpeed,equilibrium,springForce,ro
 		getRotMod =	
 			function(self)
 				return self.upsideDown						
+			end,
+		remove = 
+			function(self)
+				local path = self.path
+				boneID = 0
+				local newIndex = {}
+				for k,v in pairs(physBoneIndex) do
+					if v ~= ID then
+						boneID = boneID + 1
+						newIndex[boneID] = v
+					end
+				end
+				physBoneIndex = newIndex
+				physBone[ID] = nil
+				for k,v in pairs(path:getChildren()) do
+					v:setRot(v:getRot())
+				end
+				path:setRot(0,0,0)
 			end
 	}
 end
@@ -126,24 +146,17 @@ end
 function events.entity_init()
 	-- Pendulum object initialization
 	local function findCustomParentTypes(path)
-		for k,v in pairs(path:getChildren()) do
-			local ID = v:getName()
-			local isBone = string.find(ID,'physBone',0)
-			local isBoob = string.find(ID,'physBoob',0)
-			local isEar = string.find(ID,'physEar',0)
-			if isBone or isBoob or isEar then
-				boneID = boneID + 1
-				physBoneIndex[boneID] = ID
-				if isBone then
-					physBone[ID] = newPhysBone(v,-9.81,0.1,1,vec(0,0),0,vec(0,0,0))
-				elseif isBoob then
-					physBone[ID] = newPhysBone(v,-9.81,0.2,2,vec(0,0),70,vec(-90,0,0))
-				elseif isEar then
-					physBone[ID] = newPhysBone(v,-9.81,0.3,2,vec(90,0),30,vec(0,180,180))
+		for _,part in pairs(path:getChildren()) do
+			local ID = part:getName()
+			for presetID,preset in pairs(physBonePresets) do
+				if string.find(ID,presetID,0) then
+					boneID = boneID + 1
+					physBoneIndex[boneID] = ID
+					physBone[ID] = newPhysBone(part,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.rotMod)
+					part:setRot(0,90,0)
 				end
-				physBone[ID].path:setRot(0,90,0)
 			end
-			findCustomParentTypes(v)
+			findCustomParentTypes(part)
 		end
 	end
 	findCustomParentTypes(models)
@@ -166,17 +179,15 @@ end
 events[renderFunction] = function (delta)
 	-- Time Calculations
 	deltaTime = (physClock + delta) - lastDelta
-  lastDelta = (physClock + delta)
+
+	-- If world time / render somehow runs twice, don't run
+	if deltaTime == 0 then return end
+  
 	for _,ID in ipairs(physBoneIndex) do
 		
 		-- Pendulum logic
 		local pendulumBase = physBone[ID].path:partToWorldMatrix():apply()
-		local velocity
-    if lastestDeltaTime == 0 then
-        velocity = 0
-    else
-        velocity = (physBone[ID].pos - physBone[ID].lastPos) / lastestDeltaTime / (physBone[ID].simSpeed/100)
-    end
+		local velocity = (physBone[ID].pos - physBone[ID].lastPos) / lastestDeltaTime / (physBone[ID].simSpeed/100)
 
 		-- Air Resistance
 		local airResistanceFactor = physBone[ID].airResistance
@@ -224,5 +235,6 @@ events[renderFunction] = function (delta)
 			part:setMatrix(mat)
 		end
 	end
-	lastestDeltaTime,lasterDeltaTime,lastDeltaTime = lasterDeltaTime,lastDeltaTime,deltaTime
+	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,(physClock + delta)
 end
+return physBone
