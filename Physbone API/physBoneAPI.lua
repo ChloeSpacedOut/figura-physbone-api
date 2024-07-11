@@ -4,8 +4,10 @@ local physBoneIndex = {}
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
 local physBonePresets = {}
+local debugMode = false
 
-physBone.setPreset = function(ID,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
+-- preset physBone functions
+physBone.setPreset = function(self,ID,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
 	local presetCache = {}
 	local references = {gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, rotMod = rotMod}
 	local fallbacks = {gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, rotMod = vec(0,0,0)}
@@ -20,16 +22,16 @@ physBone.setPreset = function(ID,gravity,airResistance,simSpeed,equilibrium,spri
 	physBonePresets[ID] = presetCache
 end
 
-physBone.removePreset = function(ID)
+physBone.removePreset = function(self,ID)
 	if not physBonePresets[ID] then error('error removing preset: preset "'..ID..'" does not exist') end
 	physBonePresets[ID] = nil
 end
 
-physBone.setPreset("physBone")
-physBone.setPreset("physBoob",nil,0.2,2,nil,70,vec(-90,0,0))
-physBone.setPreset("physEar",nil,0.3,2,vec(90,0),30,vec(0,180,180))
+physBone:setPreset("physBone")
+physBone:setPreset("physBoob",nil,0.2,2,nil,70,vec(-90,0,0))
+physBone:setPreset("physEar",nil,0.3,2,vec(90,0),30,vec(0,180,180))
 
---- method by GS
+-- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
 local class_methods = {
   newPhysBone = function(self,physBonePreset)
@@ -54,8 +56,8 @@ function figuraMetatables.ModelPart:__index(key)
     return old_class_index(self, key)
   end
 end
----
 
+-- Indexes a physBone
 local function newPhysBone(path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
 	local ID = path:getName()
 	return {
@@ -97,6 +99,17 @@ local function newPhysBone(path,gravity,airResistance,simSpeed,equilibrium,sprin
 		setEquilibrium =	
 			function(self,data)
 				self.equilibrium = data
+				if host:isHost() then
+					local springForceGroup = self.path.PB_Debug_SpringForce
+					local pivot = springForceGroup:getPivot()
+					local mat = matrices.mat4()
+					mat:scale(1,self.springForce/50,1)
+					mat:translate(-pivot)
+					mat:rotate(0,0,data.x+90)
+					mat:rotate(0,data.y,0)
+					mat:translate(pivot)
+					springForceGroup:setMatrix(mat)
+				end
 				return self
 			end,
 		getEquilibrium =	
@@ -117,6 +130,9 @@ local function newPhysBone(path,gravity,airResistance,simSpeed,equilibrium,sprin
 		setRotMod =	
 			function(self,data)
 				self.rotMod = data
+				if host:isHost() then
+					self.path.PB_Debug_Direction:setRot(-data)
+				end
 				return self
 			end,
 		getRotMod =	
@@ -144,8 +160,48 @@ local function newPhysBone(path,gravity,airResistance,simSpeed,equilibrium,sprin
 	}
 end
 
+-- Generates a physBone's debug model
+local testTexture = textures:newTexture("test",1,1):setPixel(0,0,vec(1,1,1))
+function addDebugParts(part,preset)
+	local pivotGroup = part:newPart("PB_Debug_Pivot","Camera")
+	pivotGroup:newSprite("pivot")
+		:setTexture(testTexture,1,1)
+		:setColor(1,0,0)
+	  :setRenderType("EMISSIVE_SOLID")
+		:setMatrix(matrices.mat4():translate(0.5,0.5,0.5):scale(0.5,0.5,0.5):rotate(0,0,0) * 0.1)
+	
+	local directionGroup = part:newPart("PB_Debug_Direction")
+	for k = 3, 6 do
+		directionGroup:newSprite("line"..k)
+			:setTexture(testTexture,1,1)
+			:setRenderType("EMISSIVE_SOLID")
+			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,3,0.5):rotate(0,k*90,0) * 0.12)
+	end
+	directionGroup:setRot(-preset.rotMod)
+	local springForceGroup = part:newPart("PB_Debug_SpringForce")
+	for k = 3, 6 do
+		springForceGroup:newSprite("line"..k)
+			:setTexture(testTexture,1,1)
+			:setColor(0,0,1)
+			:setRenderType("EMISSIVE_SOLID")
+			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.25,3,0.25):rotate(0,k*90,0) * 0.11)
+	end
+	local pivot = springForceGroup:getPivot()
+	local mat = matrices.mat4()
+	mat:translate(-pivot)
+	mat:scale(1,preset.springForce/50,1)
+	mat:rotate(0,0,preset.equilibrium.x+90)
+	mat:rotate(0,preset.equilibrium.y,0)
+	mat:translate(pivot)
+	springForceGroup:setMatrix(mat)
+	
+	for k,v in pairs({"PB_Debug_Pivot","PB_Debug_Direction","PB_Debug_SpringForce"}) do
+		part[v]:setVisible(false)
+	end
+end
+
+-- Pendulum object initialization
 function events.entity_init()
-	-- Pendulum object initialization
 	local function findCustomParentTypes(path)
 		for _,part in pairs(path:getChildren()) do
 			local ID = part:getName()
@@ -155,12 +211,26 @@ function events.entity_init()
 					physBoneIndex[boneID] = ID
 					physBone[ID] = newPhysBone(part,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.rotMod)
 					part:setRot(0,90,0)
+					if host:isHost() then
+						addDebugParts(part,preset)
+					end
 				end
 			end
 			findCustomParentTypes(part)
 		end
 	end
 	findCustomParentTypes(models)
+end
+
+-- Debug Keybind
+local debugKeybind = keybinds:newKeybind("Toggle PhysBone Debug Mode","key.keyboard.grave.accent")
+function debugKeybind.press()
+	debugMode = not debugMode
+	for _,boneID in pairs(physBoneIndex) do
+		for k,v in pairs({"PB_Debug_Pivot","PB_Debug_Direction","PB_Debug_SpringForce"}) do
+			physBone[boneID].path[v]:setVisible(debugMode)
+		end
+	end
 end
 
 -- Simple Clock
@@ -177,6 +247,7 @@ else
 	renderFunction = "render"
 end
 
+-- Render Function
 events[renderFunction] = function (delta)
 	-- Time Calculations
 	deltaTime = (physClock + delta) - lastDelta
@@ -219,23 +290,28 @@ events[renderFunction] = function (delta)
 		-- Transform Matrix
 		local parentPivot = physBone[ID].path:getPivot()
 		for _,part in pairs(physBone[ID].path:getChildren()) do
-			local pivot = part:getPivot()
-			local mat = matrices.mat4()
-			local rot = part:getRot()
+			local partID = part:getName()
+			if partID ~= "PB_Debug_Pivot" and partID ~= "PB_Debug_SpringForce" then
+				local pivot = part:getPivot()
+				local mat = matrices.mat4()
+				local rot = part:getRot()
 
-			mat:translate(-pivot)
-			mat:rotate(rot.x,rot.y,rot.z)
-			mat:translate(pivot)
+				mat:translate(-pivot)
+				mat:rotate(rot.x,rot.y,rot.z)
+				mat:translate(pivot)
 
-			mat:translate(-parentPivot)
-			mat:rotate(physBone[ID].rotMod)
-			mat:rotate(0,-90,0)
-			mat:rotate(vec(pitch,0,yaw))
-			mat:translate(parentPivot)
+				mat:translate(-parentPivot)
+				mat:rotate(physBone[ID].rotMod)
+				mat:rotate(0,-90,0)
+				mat:rotate(vec(pitch,0,yaw))
+				mat:translate(parentPivot)
 
-			part:setMatrix(mat)
+				part:setMatrix(mat)
+			end
 		end
 	end
+	
+	-- Store deltaTime values
 	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,(physClock + delta)
 end
 return physBone
