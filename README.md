@@ -209,7 +209,5 @@ myPhysBone:remove()
 ```lua
 physBone.myPhysBone:remove()
 ```
-
-
 # Additional Notes
 If you find any issues I missed or have any features you think would be useful, please let me know and I'll see what I can do! You're also more than welcome to contribute to the project yourself if you'd like <33
