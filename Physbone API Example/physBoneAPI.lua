@@ -1,4 +1,4 @@
--- Physbone 2.0 pre-release By ChloeSpacedOut <3
+-- Physbone 2.0 pre-release 1 By ChloeSpacedOut <3
 local physBone = {}
 local physBoneIndex = {}
 local boneID = 0
@@ -37,6 +37,7 @@ local class_methods = {
   newPhysBone = function(self,physBonePreset)
 		local ID = self:getName()
 		if physBone[ID] then error('error making physBone: this physBone "'..ID..'" already exists') end
+		if not physBonePreset then error('error making physBone: your preset can not be nil') end
 		if not physBonePresets[physBonePreset] then error('error making physBone: preset "'..physBonePreset..'" does not exist') end
 		local preset = physBonePresets[physBonePreset]
 		part = self
@@ -46,7 +47,12 @@ local class_methods = {
 		physBone[ID] = newPhysBone(part,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.rotMod)
 		part:setRot(0,90,0)
 		return physBone[ID]
-  end
+  end,
+	getPhysBone = function(self)
+		local ID = self:getName()
+		if not physBone[ID] then error('cannot get physBone: this part does not have a physBone') end
+		return physBone[ID]
+	end
 }
 
 function figuraMetatables.ModelPart:__index(key)
