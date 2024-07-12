@@ -1,5 +1,5 @@
 # Figura PhysBone API
-A cheap, easy to use, and highly customisable physics system.
+An easy to use, and highly customisable physics system.
 ## Basic Installation 
 To install the physBone API, simply add `physBoneAPI.lua` into your script. Obviously if you use autoScripts in avatar.json, add it there. Require is not needed for doing just the basics.
 ## Basic PhysBones
