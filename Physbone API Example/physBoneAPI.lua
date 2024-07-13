@@ -34,7 +34,6 @@ function events.entity_init()
 					path = v,
 					pos 	= v:partToWorldMatrix():apply(),
 					lastPos = v:partToWorldMatrix():apply(),
-					lastRelativeVec = vec(0,-1,0),
 					gravity = -9.81,
 					setGravity =	
 						function(self,data)
@@ -80,7 +79,7 @@ function events.entity_init()
 						function(self)
 							return self.springForce						
 						end,
-					boundaries = {min = vec(-0.5,-1,-1), max = vec(1,1,1)},
+					boundaries = {min = vec(0,-1,-1), max = vec(1,1,1)},
 					setBoundaries =	
 						function(self,min,max)
 							self.boundaries.min = min
@@ -114,7 +113,7 @@ local function boundaryCollisionCheck(k,lastRelativeVec,relativeVec)
 		local doesCollideMin = (physBone[k].boundaries.min.x > lerpedRelativeVec.x) or (physBone[k].boundaries.min.y > lerpedRelativeVec.y) or (physBone[k].boundaries.min.z > lerpedRelativeVec.z)
 		local doesCollideMax = (physBone[k].boundaries.max.x < lerpedRelativeVec.x) or (physBone[k].boundaries.max.y < lerpedRelativeVec.y) or (physBone[k].boundaries.max.z < lerpedRelativeVec.z)
 		if doesCollideMin or doesCollideMax then
-			return true, lerpedRelativeVec
+			return true
 		end
 	end
 	return false
@@ -144,29 +143,26 @@ function events.tick()
 		velocity = velocity + vec(0,physBone[k].gravity,0) * simspeed
 
 		-- Finalise Physics
+		local tempTemp = physBone[k].lastPos
 		physBone[k].lastPos = physBone[k].pos
 		physBone[k].pos = physBone[k].pos + velocity 
+		-- NOTE!!! air resistance & spring force aren't effected by sim speed. Fix this!
 
 		local direction = physBone[k].pos - pendulumBase
 		physBone[k].pos = pendulumBase + direction:normalized()
 
 		-- Rotation Calcualtion
-		local lastRelativeVec = physBone[k].lastRelativeVec:copy()
-		local relativeVec = physBone[k].path:partToWorldMatrix():invert():apply(physBone[k].pos):normalize()
-		
+		local lastRelativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(physBone[k].lastPos):normalize()
+		local relativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(physBone[k].pos):normalize()
 		
 
 		-- Boundary Collisions
-		local isTrue,lerpedRelativeVec = boundaryCollisionCheck(k,lastRelativeVec,relativeVec)
-		if isTrue then
-			physBone[k].lastPos = physBone[k].path:partToWorldMatrix():apply(lerpedRelativeVec)
-			physBone[k].pos = physBone[k].path:partToWorldMatrix():apply(lastRelativeVec)
-			relativeVec = lastRelativeVec
-			-- issue with lastRelativeVec. Part isn't escaping when it should be. If it does, this should work. Maybe remvoe the invert matrix from lastPos
+		if boundaryCollisionCheck(k,lastRelativeVec,relativeVec) then
+			local temp = physBone[k].pos
+			physBone[k].pos = tempTemp
+			physBone[k].lastPos = temp
 		end
 		
-		physBone[k].lastRelativeVec = relativeVec
-
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		yaw = math.deg(math.atan2(relativeVec.x,relativeVec.z))
 		pitch = math.deg(math.asin(-relativeVec.y))
