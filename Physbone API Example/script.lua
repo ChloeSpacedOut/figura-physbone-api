@@ -1,8 +1,7 @@
-require('physBoneAPI')
-function events.entity_init()
-  physBone.physBoneBouncy:setSpringForce(0.5)
-end
+physBone = require('physBoneAPI')
 
-function events.tick()
-  physBone.physBoneBouncy:setEquilibrium(-player:getLookDir())
+function events.entity_init()
+  physBone.physBoneBouncy:setRotMod(-90,0,0)
+  physBone.physBoneBouncy:setSpringForce(50)
+  physBone.physBoneBouncy:setEquilibrium(vec(0,0))
 end
