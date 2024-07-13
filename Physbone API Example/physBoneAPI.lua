@@ -1,6 +1,5 @@
 -- By ChloeSpacedOut <3
 physBone = {}
-local physBoneIndex = {}
 
 -- Time variables
 local previousTime = client:getSystemTime() -- Milliseconds
@@ -21,14 +20,11 @@ local function getPos(ID)
 end
 
 function events.entity_init()
-	local boneID = 0
 	-- Pendulum object initialization
 	local function findCustomParentTypes(path)
 		for k,v in pairs(path:getChildren()) do
 			local name = v:getName()
 			if string.find(name,'physBone',0) and not (string.find(name,'PYC',0) or string.find(name,'RC',0))  then
-				boneID = boneID + 1
-				physBoneIndex[boneID] = name
 				physBone[name] = {
 					ID = name,
 					path = v,
@@ -78,16 +74,6 @@ function events.entity_init()
 					getSpringForce =	
 						function(self)
 							return self.springForce						
-						end,
-					boundaries = {min = vec(0,-1,-1), max = vec(1,1,1)},
-					setBoundaries =	
-						function(self,min,max)
-							self.boundaries.min = min
-							self.boundaries.max = max
-						end,
-					getBoundaries =
-						function (self)
-							return self.boundaries.min, self.boundaries.max
 						end
 				}
 				v:newPart('PYC'..name)
@@ -107,61 +93,34 @@ function events.entity_init()
 	findCustomParentTypes(models)
 end
 
-local function boundaryCollisionCheck(k,lastRelativeVec,relativeVec)
-	for v = 0, 10 do
-		local lerpedRelativeVec  = math.lerp(lastRelativeVec,relativeVec,v/10)
-		local doesCollideMin = (physBone[k].boundaries.min.x > lerpedRelativeVec.x) or (physBone[k].boundaries.min.y > lerpedRelativeVec.y) or (physBone[k].boundaries.min.z > lerpedRelativeVec.z)
-		local doesCollideMax = (physBone[k].boundaries.max.x < lerpedRelativeVec.x) or (physBone[k].boundaries.max.y < lerpedRelativeVec.y) or (physBone[k].boundaries.max.z < lerpedRelativeVec.z)
-		if doesCollideMin or doesCollideMax then
-			return true
-		end
-	end
-	return false
-end
-
 function events.tick()
 	updateTime()
 	local deltaTimeInSeconds = deltaTime / 1000 -- Delta Time in seconds
 
-	for key,v in ipairs(physBoneIndex) do
-		local k = v	
-		local simspeed = (deltaTimeInSeconds*1.3*physBone[k].simSpeed)^2
+	for k,v in pairs(physBone) do
 		-- Pendulum logic
 		local pendulumBase = getPos(k)
-		local velocity = (physBone[k].pos - physBone[k].lastPos)	
+		local velocity = (physBone[k].pos - physBone[k].lastPos)
 
 		-- Air Resistance
 		local airResistanceFactor = physBone[k].airResistance -- Adjust this value to control the strength of air resistance
 		local airResistance = velocity * (-airResistanceFactor)
-		velocity = velocity + airResistance * simspeed
+		velocity = velocity + airResistance
 		
 		-- Spring force
 		local springForce = physBone[k].equilibrium:normalized() * (-physBone[k].springForce)
-		velocity = velocity + springForce * simspeed
-
-		-- Gravity
-		velocity = velocity + vec(0,physBone[k].gravity,0) * simspeed
+		velocity = velocity + springForce
 
 		-- Finalise Physics
-		local tempTemp = physBone[k].lastPos
-		physBone[k].lastPos = physBone[k].pos
-		physBone[k].pos = physBone[k].pos + velocity 
+		physBone[k].lastPos = physBone[k].pos:copy()
+		physBone[k].pos = physBone[k].pos + velocity + vec(0, physBone[k].gravity * ((deltaTimeInSeconds*1.3*physBone[k].simSpeed)^2), 0)
 		-- NOTE!!! air resistance & spring force aren't effected by sim speed. Fix this!
 
 		local direction = physBone[k].pos - pendulumBase
 		physBone[k].pos = pendulumBase + direction:normalized()
 
 		-- Rotation Calcualtion
-		local lastRelativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(physBone[k].lastPos):normalize()
-		local relativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(physBone[k].pos):normalize()
-		
-
-		-- Boundary Collisions
-		if boundaryCollisionCheck(k,lastRelativeVec,relativeVec) then
-			local temp = physBone[k].pos
-			physBone[k].pos = tempTemp
-			physBone[k].lastPos = temp
-		end
+		local relativeVec = (physBone[k].path:partToWorldMatrix()):invert():apply(pendulumBase + (physBone[k].pos - pendulumBase)):normalize()
 		
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		yaw = math.deg(math.atan2(relativeVec.x,relativeVec.z))
