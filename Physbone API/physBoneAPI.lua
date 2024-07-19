@@ -282,8 +282,8 @@ events.entity_init:register(function()
 				if ID:find(presetID,0) then
 					boneID = boneID + 1
 					physBoneIndex[boneID] = ID
-					local physBone = physBone.newPhysBone(part,preset)
-					physBone.children[ID] = physBone
+					local bone = physBone.newPhysBone(part,preset)
+          physBone.children[ID] = bone
 
 					part:setRot(0,90,0)
 				end
