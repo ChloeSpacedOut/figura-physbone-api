@@ -4,6 +4,7 @@ local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
 	allowDuplicates=false, 
 	children={},index={}}
+local physBoneInternal = {}
 local physBoneIndex = physBone.index
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
@@ -19,7 +20,7 @@ local physBoneBase = {
 			end,
 		getGravity =	
 			function(self)
-				return self.gravity						
+				return self.gravity
 			end,
 		setRotMod =	
 			function(self,data)
@@ -31,7 +32,7 @@ local physBoneBase = {
 			end,
 		getRotMod =	
 			function(self)
-				return self.upsideDown						
+				return self.upsideDown
 			end,
 		remove = 
 			function(self)
@@ -78,7 +79,7 @@ local physBoneBase = {
 			end,
 		getEquilibrium =	
 			function(self)
-				return self.equilibrium						
+				return self.equilibrium
 			end,
 		setAirResistance =	
 			function(self,data)
@@ -87,7 +88,7 @@ local physBoneBase = {
 			end,
 		getAirResistance =	
 			function(self)
-				return self.airResistance						
+				return self.airResistance
 			end,
 		setSimSpeed =	
 			function(self,data)
@@ -96,18 +97,13 @@ local physBoneBase = {
 			end,
 		getSimSpeed =	
 			function(self)
-				return self.simSpeed						
+				return self.simSpeed
 			end,
-
 }
-
 local physBoneMT = {__index=physBoneBase}
 
-
-
-
--- Creates a new physBone
-physBone.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name)
+-- Internal Function: Returns physbone metatable from set values
+physBoneInternal.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
 		path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name = self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name
@@ -130,9 +126,9 @@ physBone.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpe
 		rotMod = rotMod,
 	},physBoneMT)
 end
--- 
 
-physBone.addPhysBone = function(self,part,index)
+-- Internal Function: Creates a physbone based on the provided metatable
+physBoneInternal.addPhysBone = function(self,part,index)
 	if self ~= physBone then
 		index,part=part,index
 	end
@@ -150,6 +146,7 @@ physBone.addPhysBone = function(self,part,index)
 	return part
 end
 
+-- Creates a new physBone
 physBone.newPhysBone = function(self,part,physBonePreset)
 	if self ~= physBone then
 		physBonePreset,part=part,self
@@ -157,9 +154,9 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(part,'error making physBone: part is null!')
 	local ID = part:getName()
 
-  if(physBone.allowDuplicates and physBone[ID]) then
-      ID = ID..boneID+1
-  end 
+	if(physBone.allowDuplicates and physBone[ID]) then
+			ID = ID..boneID+1
+	end 
 	assert(not physBone[ID],'error making physBone: this physBone "'..ID..'" already exists')
 	assert(physBonePreset,'error making physBone: your preset can not be nil')
 	local preset = type(physBonePreset) == "table" and physBonePreset or physBonePresets[physBonePreset]
@@ -174,6 +171,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	return p
 end
 
+-- Returns your physBone
 physBone.getPhysBone = function(self,part)
 	if self ~= physBone then
 		part = self
@@ -184,7 +182,7 @@ physBone.getPhysBone = function(self,part)
 	return physBone[ID]
 end
 
--- preset physBone functions
+-- Creates a new or sets the value of an existing preset
 physBone.setPreset = function(self,ID,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
 	local presetCache = {}
 	local references = {gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, rotMod = rotMod}
@@ -200,12 +198,13 @@ physBone.setPreset = function(self,ID,gravity,airResistance,simSpeed,equilibrium
 	physBonePresets[ID] = presetCache
 end
 
+-- Removes an existing preset
 physBone.removePreset = function(self,ID)
 	if not physBonePresets[ID] then error('error removing preset: preset "'..ID..'" does not exist') end
 	physBonePresets[ID] = nil
 end
 
-
+-- Default presets
 physBone:setPreset("physBone")
 physBone:setPreset("physBoob",nil,0.2,2,nil,70,vec(-90,0,0))
 physBone:setPreset("physEar",nil,0.3,2,vec(90,0),30,vec(0,180,180))
@@ -213,9 +212,9 @@ physBone:setPreset("physEar",nil,0.3,2,vec(90,0),30,vec(0,180,180))
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
 local class_methods = {
-  newPhysBone = function(self,physBonePreset)
-  	return physBone:newPhysBone(self,physBonePreset)
-  end,
+	newPhysBone = function(self,physBonePreset)
+		return physBone:newPhysBone(self,physBonePreset)
+	end,
 	getPhysBone = function(self)
 		return physBone:getPhysBone(self)
 
@@ -223,24 +222,22 @@ local class_methods = {
 }
 
 function figuraMetatables.ModelPart:__index(key)
-  if class_methods[key] then
-    return class_methods[key]
-  else
-    return old_class_index(self, key)
-  end
+	if class_methods[key] then
+		return class_methods[key]
+	else
+		return old_class_index(self, key)
+	end
 end
+--
 
-
-
-
-testTexture = textures:newTexture("test",1,1):setPixel(0,0,vec(1,1,1))
 -- Generates a physBone's debug model
+local testTexture = textures:newTexture("test",1,1):setPixel(0,0,vec(1,1,1))
 function physBone.addDebugParts(part,preset)
 	local pivotGroup = part:newPart("PB_Debug_Pivot","Camera")
 	pivotGroup:newSprite("pivot")
 		:setTexture(testTexture,1,1)
 		:setColor(1,0,0)
-	  :setRenderType("EMISSIVE_SOLID")
+		:setRenderType("EMISSIVE_SOLID")
 		:setMatrix(matrices.mat4():translate(0.5,0.5,0.5):scale(0.5,0.5,0.5):rotate(0,0,0) * 0.1)
 	
 	local directionGroup = part:newPart("PB_Debug_Direction")
@@ -275,7 +272,6 @@ end
 
 -- Pendulum object initialization
 events.entity_init:register(function()
-
 	local function findCustomParentTypes(path)
 		for _,part in pairs(path:getChildren()) do
 			local ID = part:getName()
@@ -291,11 +287,8 @@ events.entity_init:register(function()
 	end
 	findCustomParentTypes(models)
 end,'PHYSBONE.pendulumObjectInit')
-local physClock = 0
-events.tick:register(function()
-	physClock = physClock + 1
-end,'PHYSBONE.physClock')
--- Debug Keybind
+
+-- Debug keybind
 local debugKeybind = keybinds:newKeybind("Toggle PhysBone Debug Mode","key.keyboard.grave.accent")
 function debugKeybind.press()
 	debugMode = not debugMode
@@ -306,26 +299,28 @@ function debugKeybind.press()
 	end
 end
 
--- Simple Clock
+-- Simple clock
+local physClock = 0
+events.tick:register(function()
+	physClock = physClock + 1
+end,'PHYSBONE.physClock')
 
-
--- Render Function Chooser
+-- Render function prep
 local renderFunction = "render"
-
 local deg = math.deg
 local atan2 = math.atan2
 local asin = math.asin
 local invalidContexts = {
-	['PAPERDOLL']=true,
-	['MINECRAFT_GUI']=true,
+	PAPERDOLL = true,
+	MINECRAFT_GUI = true,
 
 }
--- Render Function
+-- Render function
 events[renderFunction]:register(function (delta,context)
 	if(invalidContexts[context] or client:isPaused()) then
 		return
 	end
-	-- Time Calculations
+	-- Time calculations
 	local time = (physClock + delta)
 	local deltaTime = time - lastDelta
 
@@ -334,21 +329,21 @@ events[renderFunction]:register(function (delta,context)
 	if deltaTime == 0 then return end
 	for _,curPhysBoneID in pairs(physBoneIndex) do
 		curPhysBone = physBone[curPhysBoneID]
-		-- local curPhysBone = physBone[ID]
 		local worldPartMat = curPhysBone.path:partToWorldMatrix()
 		
 		-- Pendulum logic
 		local pendulumBase =  worldPartMat:apply()
 		local velocity = (curPhysBone.pos - curPhysBone.lastPos) / lastestDeltaTime / (curPhysBone.simSpeed/100)
 
-		-- Air Resistance
+		-- Air resistance
 		local airResistanceFactor = curPhysBone.airResistance
-		-- if(airResistanceFactor ~= 0) then
+		if airResistanceFactor ~= 0 then
 			local airResistance = velocity * (-airResistanceFactor)
 			velocity = velocity + airResistance * lasterDeltaTime
-		-- end
+		end
+
 		-- Spring force
-		if(curPhysBone.springForce ~= 0) then 
+		if curPhysBone.springForce ~= 0 then 
 			local equalib = curPhysBone.equilibrium
 			local relativeDirMat = curPhysBone.path:getParent():partToWorldMatrix():copy() * matrices.mat4():rotate(equalib.x,equalib.y,equalib.z)
 			local reliveDir = relativeDirMat:applyDir(0,0,-1):normalized()
@@ -359,22 +354,22 @@ events[renderFunction]:register(function (delta,context)
 		-- Gravity
 		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime 
 
-		-- Finalise Physics
+		-- Finalise physics
 		curPhysBone.lastPos = curPhysBone.pos:copy()
 		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * (curPhysBone.simSpeed/100)) - pendulumBase
 		curPhysBone.pos = pendulumBase + direction:normalized()
 
-		-- Rotation Calcualtion
+		-- Rotation calcualtion
 		local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		yaw = deg(atan2(relativeVec.x,relativeVec.z))
 		pitch = deg(asin(-relativeVec.y))
 
-		-- Transform Matrix
-		if(curPhysBone.path:getVisible()) then
+		-- Transform matrix
+		if curPhysBone.path:getVisible() then
 			local parentPivot = curPhysBone.path:getPivot()
 			for _,part in pairs(curPhysBone.path:getChildren()) do
-				if(part:getVisible()) then
+				if part:getVisible() then
 					local partID = part:getName()
 					if partID ~= "PB_Debug_Pivot" and partID ~= "PB_Debug_SpringForce" then
 						local pivot = part:getPivot()
