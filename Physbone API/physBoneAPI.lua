@@ -9,7 +9,6 @@ local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
 local physBonePresets = {}
 local debugMode = false
-local initedEntity = false
 
 -- Physbone metatable
 local physBoneBase = {
@@ -150,6 +149,7 @@ physBone.addPhysBone = function(self,part,index)
 	physBone[ID] = part
 	return part
 end
+
 physBone.newPhysBone = function(self,part,physBonePreset)
 	if self ~= physBone then
 		physBonePreset,part=part,self
@@ -157,14 +157,13 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(part,'error making physBone: part is null!')
 	local ID = part:getName()
 
-	if(physBone.allowDuplicates and physBone[ID]) then
-		ID = ID..boneID+1
-	end 
+  if(physBone.allowDuplicates and physBone[ID]) then
+      ID = ID..boneID+1
+  end 
 	assert(not physBone[ID],'error making physBone: this physBone "'..ID..'" already exists')
 	assert(physBonePreset,'error making physBone: your preset can not be nil')
 	local preset = type(physBonePreset) == "table" and physBonePreset or physBonePresets[physBonePreset]
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
-	boneID = boneID + 1
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
 		physBone.newPhysBoneFromValues(part,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.rotMod,boneID,ID)
@@ -174,8 +173,8 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	end
 	return p
 end
-physBone.getPhysBone = function(self,part)
 
+physBone.getPhysBone = function(self,part)
 	if self ~= physBone then
 		part = self
 	end
@@ -184,6 +183,7 @@ physBone.getPhysBone = function(self,part)
 	assert(physBone[ID],('cannot get physBone: this part does not have a physBone'))
 	return physBone[ID]
 end
+
 -- preset physBone functions
 physBone.setPreset = function(self,ID,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
 	local presetCache = {}
@@ -199,6 +199,7 @@ physBone.setPreset = function(self,ID,gravity,airResistance,simSpeed,equilibrium
 	end
 	physBonePresets[ID] = presetCache
 end
+
 physBone.removePreset = function(self,ID)
 	if not physBonePresets[ID] then error('error removing preset: preset "'..ID..'" does not exist') end
 	physBonePresets[ID] = nil
@@ -279,13 +280,10 @@ events.entity_init:register(function()
 		for _,part in pairs(path:getChildren()) do
 			local ID = part:getName()
 			for presetID,preset in pairs(physBonePresets) do
-				if ID:find(presetID,0) then
-					boneID = boneID + 1
-					physBoneIndex[boneID] = ID
-					local bone = physBone.newPhysBone(part,preset)
-          physBone.children[ID] = bone
-
+				if ID:sub(0,#presetID) == presetID then
+					physBone.newPhysBone(part,preset)
 					part:setRot(0,90,0)
+					break
 				end
 			end
 			findCustomParentTypes(part)
@@ -334,9 +332,8 @@ events[renderFunction]:register(function (delta,context)
 
 	-- If world time / render somehow runs twice, don't run
 	if deltaTime == 0 then return end
-  
-	for _,curPhysBone in pairs(physBone.children) do
-
+	for _,curPhysBoneID in pairs(physBoneIndex) do
+		curPhysBone = physBone[curPhysBoneID]
 		-- local curPhysBone = physBone[ID]
 		local worldPartMat = curPhysBone.path:partToWorldMatrix()
 		

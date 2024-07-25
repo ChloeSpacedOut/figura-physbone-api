@@ -1,4 +1,4 @@
-physBone = require('physBoneAPI')
+local physBone = require('physBoneAPI')
 
 function events.entity_init()
   physBone.physBoneBouncy:setRotMod(-90,0,0)
