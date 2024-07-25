@@ -4,7 +4,6 @@ local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
 	allowDuplicates=false, 
 	children={},index={}}
-local physBoneInternal = {}
 local physBoneIndex = physBone.index
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
@@ -103,7 +102,7 @@ local physBoneBase = {
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBoneInternal.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name)
+physBone.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
 		path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name = self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name
@@ -128,7 +127,7 @@ physBoneInternal.newPhysBoneFromValues = function(self,path,gravity,airResistanc
 end
 
 -- Internal Function: Creates a physbone based on the provided metatable
-physBoneInternal.addPhysBone = function(self,part,index)
+physBone.addPhysBone = function(self,part,index)
 	if self ~= physBone then
 		index,part=part,index
 	end
