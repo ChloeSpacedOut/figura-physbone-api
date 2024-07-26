@@ -215,8 +215,8 @@ end
 
 -- Default presets
 physBone:setPreset("physBone")
-physBone:setPreset("physBoob",vec(-90,0,0),2,nil,0.4,nil,nil,140)
-physBone:setPreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(90,0),90)
+physBone:setPreset("physBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
+physBone:setPreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(90,0),120)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
