@@ -2,7 +2,7 @@
 -- Some funny additions made by Superpowers04 :3
 local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
-	allowDuplicates=false, 
+	allowDuplicates=false,
 	children={},index={}}
 local physBoneIndex = physBone.index
 local boneID = 0
@@ -12,100 +12,109 @@ local debugMode = false
 
 -- Physbone metatable
 local physBoneBase = {
-		setGravity =	
-			function(self,data)
-				self.gravity = data
-				return self
-			end,
-		getGravity =	
-			function(self)
-				return self.gravity
-			end,
-		setRotMod =	
-			function(self,data)
-				self.rotMod = data
-				if host:isHost() and self.path.PB_Debug_Direction then
-					self.path.PB_Debug_Direction:setRot(-data)
+	setRotMod =
+		function(self,data)
+			self.rotMod = data
+			if host:isHost() and self.path.PB_Debug_Direction then
+				self.path.PB_Debug_Direction:setRot(-data)
+			end
+			return self
+		end,
+	getRotMod =
+		function(self)
+			return self.upsideDown
+		end,
+	setMass =
+		function(self,data)
+			self.mass = data
+			return self
+		end,
+	getMass =
+		function(self)
+			return self.mass
+		end,
+	setGravity =
+		function(self,data)
+			self.gravity = data
+			return self
+		end,
+	getGravity =
+		function(self)
+			return self.gravity
+		end,
+	remove =
+		function(self)
+			local path = self.path
+			boneID = 0
+			local newIndex = {}
+			for k,v in pairs(physBoneIndex) do
+				if v ~= ID then
+					boneID = boneID + 1
+					newIndex[boneID] = v
 				end
-				return self
-			end,
-		getRotMod =	
-			function(self)
-				return self.upsideDown
-			end,
-		remove = 
-			function(self)
-				local path = self.path
-				boneID = 0
-				local newIndex = {}
-				for k,v in pairs(physBoneIndex) do
-					if v ~= ID then
-						boneID = boneID + 1
-						newIndex[boneID] = v
-					end
-				end
-				physBoneIndex = newIndex
-				physBone[ID] = nil
-				for k,v in pairs(path:getChildren()) do
-					v:setRot(v:getRot())
-				end
-				path:setRot(0,0,0)
-			end,
-		setSpringForce =	
-			function(self,data)
-				self.springForce = data
-				return self
-			end,
-		getSpringForce =	
-			function(self)
-				return self.springForce
-			end,
-		setEquilibrium =	
-			function(self,data)
-				self.equilibrium = data
-				if host:isHost() and self.path.PB_Debug_SpringForce then
-					local springForceGroup = self.path.PB_Debug_SpringForce
-					local pivot = springForceGroup:getPivot()
-					local mat = matrices.mat4()
-					mat:scale(1,self.springForce/50,1)
-						:translate(-pivot)
-						:rotate(0,0,data.x+90)
-						:rotate(0,data.y,0)
-						:translate(pivot)
-					springForceGroup:setMatrix(mat)
-				end
-				return self
-			end,
-		getEquilibrium =	
-			function(self)
-				return self.equilibrium
-			end,
-		setAirResistance =	
-			function(self,data)
-				self.airResistance = data
-				return self
-			end,
-		getAirResistance =	
-			function(self)
-				return self.airResistance
-			end,
-		setSimSpeed =	
-			function(self,data)
-				self.simSpeed = data
-				return self
-			end,
-		getSimSpeed =	
-			function(self)
-				return self.simSpeed
-			end,
+			end
+			physBoneIndex = newIndex
+			physBone[ID] = nil
+			for k,v in pairs(path:getChildren()) do
+				v:setRot(v:getRot())
+			end
+			path:setRot(0,0,0)
+		end,
+	setSpringForce =
+		function(self,data)
+			self.springForce = data
+			return self
+		end,
+	getSpringForce =
+		function(self)
+			return self.springForce
+		end,
+	setEquilibrium =
+		function(self,data)
+			self.equilibrium = data
+			if host:isHost() and self.path.PB_Debug_SpringForce then
+				local springForceGroup = self.path.PB_Debug_SpringForce
+				local pivot = springForceGroup:getPivot()
+				local mat = matrices.mat4()
+				mat:scale(1,self.springForce/50,1)
+					:translate(-pivot)
+					:rotate(0,0,data.x+90)
+					:rotate(0,data.y,0)
+					:translate(pivot)
+				springForceGroup:setMatrix(mat)
+			end
+			return self
+		end,
+	getEquilibrium =
+		function(self)
+			return self.equilibrium
+		end,
+	setAirResistance =
+		function(self,data)
+			self.airResistance = data
+			return self
+		end,
+	getAirResistance =
+		function(self)
+			return self.airResistance
+		end,
+	setSimSpeed =
+		function(self,data)
+			self.simSpeed = data
+			return self
+		end,
+	getSimSpeed =
+		function(self)
+			return self.simSpeed
+		end,
 }
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name = self,path,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -117,12 +126,13 @@ physBone.newPhysBoneFromValues = function(self,path,gravity,airResistance,simSpe
 		path = path,
 		pos = pos,
 		lastPos = pos:copy(),
+		rotMod = rotMod,
+		mass = mass,
 		gravity = gravity,
 		airResistance = airResistance,
 		simSpeed = simSpeed,
 		equilibrium = equilibrium,
 		springForce = springForce,
-		rotMod = rotMod,
 	},physBoneMT)
 end
 
@@ -155,14 +165,14 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 
 	if(physBone.allowDuplicates and physBone[ID]) then
 			ID = ID..boneID+1
-	end 
+	end
 	assert(not physBone[ID],'error making physBone: this physBone "'..ID..'" already exists')
 	assert(physBonePreset,'error making physBone: your preset can not be nil')
 	local preset = type(physBonePreset) == "table" and physBonePreset or physBonePresets[physBonePreset]
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.rotMod,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -182,10 +192,10 @@ physBone.getPhysBone = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,gravity,airResistance,simSpeed,equilibrium,springForce,rotMod)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce)
 	local presetCache = {}
-	local references = {gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, rotMod = rotMod}
-	local fallbacks = {gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, rotMod = vec(0,0,0)}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0}
 	for valID, fallbackVal in pairs(fallbacks) do
 		presetVal = references[valID]
 		if presetVal then
@@ -205,8 +215,8 @@ end
 
 -- Default presets
 physBone:setPreset("physBone")
-physBone:setPreset("physBoob",nil,0.2,2,nil,70,vec(-90,0,0))
-physBone:setPreset("physEar",nil,0.3,2,vec(90,0),30,vec(0,180,180))
+physBone:setPreset("physBoob",vec(-90,0,0),2,nil,0.4,nil,nil,140)
+physBone:setPreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(90,0),90)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
@@ -238,7 +248,7 @@ function physBone.addDebugParts(part,preset)
 		:setColor(1,0,0)
 		:setRenderType("EMISSIVE_SOLID")
 		:setMatrix(matrices.mat4():translate(0.5,0.5,0.5):scale(0.5,0.5,0.5):rotate(0,0,0) * 0.1)
-	
+
 	local directionGroup = part:newPart("PB_Debug_Direction")
 	for k = 3, 6 do
 		directionGroup:newSprite("line"..k)
@@ -263,7 +273,7 @@ function physBone.addDebugParts(part,preset)
 		:rotate(0,preset.equilibrium.y,0)
 		:translate(pivot)
 	springForceGroup:setMatrix(mat)
-	
+
 	for k,v in pairs({"PB_Debug_Pivot","PB_Debug_Direction","PB_Debug_SpringForce"}) do
 		part[v]:setVisible(false)
 	end
@@ -312,7 +322,7 @@ local asin = math.asin
 local invalidContexts = {
 	PAPERDOLL = true,
 	MINECRAFT_GUI = true,
-
+	FIGURA_GUI = true
 }
 -- Render function
 events[renderFunction]:register(function (delta,context)
@@ -329,33 +339,33 @@ events[renderFunction]:register(function (delta,context)
 	for _,curPhysBoneID in pairs(physBoneIndex) do
 		curPhysBone = physBone[curPhysBoneID]
 		local worldPartMat = curPhysBone.path:partToWorldMatrix()
-		
+
 		-- Pendulum logic
 		local pendulumBase =  worldPartMat:apply()
-		local velocity = (curPhysBone.pos - curPhysBone.lastPos) / lastestDeltaTime / (curPhysBone.simSpeed/100)
+		local velocity = (curPhysBone.pos - curPhysBone.lastPos) / lastestDeltaTime / ((curPhysBone.simSpeed * curPhysBone.mass)/100)
 
 		-- Air resistance
 		local airResistanceFactor = curPhysBone.airResistance
 		if airResistanceFactor ~= 0 then
 			local airResistance = velocity * (-airResistanceFactor)
-			velocity = velocity + airResistance * lasterDeltaTime
+			velocity = velocity + airResistance * lasterDeltaTime / curPhysBone.mass
 		end
 
 		-- Spring force
-		if curPhysBone.springForce ~= 0 then 
+		if curPhysBone.springForce ~= 0 then
 			local equalib = curPhysBone.equilibrium
 			local relativeDirMat = curPhysBone.path:getParent():partToWorldMatrix():copy() * matrices.mat4():rotate(equalib.x,equalib.y,equalib.z)
 			local reliveDir = relativeDirMat:applyDir(0,0,-1):normalized()
 			local springForce = reliveDir * curPhysBone.springForce
-			velocity = velocity + springForce * lasterDeltaTime
+			velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
 		end
 
 		-- Gravity
-		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime 
+		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime / curPhysBone.mass
 
 		-- Finalise physics
 		curPhysBone.lastPos = curPhysBone.pos:copy()
-		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * (curPhysBone.simSpeed/100)) - pendulumBase
+		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
 		curPhysBone.pos = pendulumBase + direction:normalized()
 
 		-- Rotation calcualtion
@@ -391,7 +401,7 @@ events[renderFunction]:register(function (delta,context)
 			end
 		end
 	end
-	
+
 	-- Store deltaTime values
 	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,time
 end,'PHYSBONE.'..renderFunction)
