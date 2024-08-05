@@ -107,14 +107,44 @@ local physBoneBase = {
 		function(self)
 			return self.simSpeed
 		end,
+	setForce =
+		function(self,data)
+			self.force = data
+			return self
+		end,
+	getForce =
+		function(self)
+			return self.force
+		end,
+	setVecMod =
+		function(self,data)
+			self.vecMod = data
+			return self
+		end,
+	getVecMod =
+		function(self)
+			return self.vecMod
+		end,
+	setPreset = 
+		function(self,presetID)
+			assert(presetID,'error making physBone: your preset can not be nil')
+			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
+			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
+			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod"} do
+				if preset[v] then
+					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
+					self[funct](self,preset[v])
+				end
+			end
+		end
 }
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -133,6 +163,8 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 		simSpeed = simSpeed,
 		equilibrium = equilibrium,
 		springForce = springForce,
+		force = force,
+		vecMod = vecMod
 	},physBoneMT)
 end
 
@@ -172,7 +204,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -192,10 +224,10 @@ physBone.getPhysBone = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce)
+physBone.updatePreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
 	local presetCache = {}
-	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1)}
 	for valID, fallbackVal in pairs(fallbacks) do
 		presetVal = references[valID]
 		if presetVal then
@@ -214,9 +246,12 @@ physBone.removePreset = function(self,ID)
 end
 
 -- Default presets
-physBone:setPreset("physBone")
-physBone:setPreset("physBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
-physBone:setPreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(90,0),120)
+physBone:updatePreset("physBone")
+physBone:updatePreset("PhysBone")
+physBone:updatePreset("physBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
+physBone:updatePreset("PhysBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
+physBone:updatePreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(0,90),120)
+physBone:updatePreset("PhysEar",vec(0,180,180),2,nil,0.5,nil,vec(0,90),120)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
@@ -355,10 +390,15 @@ events[renderFunction]:register(function (delta,context)
 		-- Spring force
 		if curPhysBone.springForce ~= 0 then
 			local equalib = curPhysBone.equilibrium
-			local relativeDirMat = curPhysBone.path:getParent():partToWorldMatrix():copy() * matrices.mat4():rotate(equalib.x,equalib.y,equalib.z)
+			local relativeDirMat = curPhysBone.path:getParent():partToWorldMatrix():copy() * matrices.mat4():rotate(equalib.y,equalib.x,0)
 			local reliveDir = relativeDirMat:applyDir(0,0,-1):normalized()
 			local springForce = reliveDir * curPhysBone.springForce
 			velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
+		end
+
+		-- Custom force
+		if curPhysBone.force ~= vec(0,0,0) then
+			velocity = velocity + curPhysBone.force * lasterDeltaTime / curPhysBone.mass^2
 		end
 
 		-- Gravity
@@ -371,6 +411,7 @@ events[renderFunction]:register(function (delta,context)
 
 		-- Rotation calcualtion
 		local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
+		relativeVec = (relativeVec * curPhysBone.vecMod):normalized()
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		yaw = deg(atan2(relativeVec.x,relativeVec.z))
 		pitch = deg(asin(-relativeVec.y))
