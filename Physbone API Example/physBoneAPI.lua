@@ -125,7 +125,7 @@ local physBoneBase = {
 		function(self)
 			return self.vecMod
 		end,
-	setPreset = 
+	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
@@ -224,7 +224,7 @@ physBone.getPhysBone = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.updatePreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
 	local presetCache = {}
 	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod}
 	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1)}
@@ -246,12 +246,12 @@ physBone.removePreset = function(self,ID)
 end
 
 -- Default presets
-physBone:updatePreset("physBone")
-physBone:updatePreset("PhysBone")
-physBone:updatePreset("physBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
-physBone:updatePreset("PhysBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
-physBone:updatePreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(0,90),120)
-physBone:updatePreset("PhysEar",vec(0,180,180),2,nil,0.5,nil,vec(0,90),120)
+physBone:setPreset("physBone")
+physBone:setPreset("PhysBone")
+physBone:setPreset("physBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
+physBone:setPreset("PhysBoob",vec(-90,0,0),2,nil,0.5,nil,nil,200)
+physBone:setPreset("physEar",vec(0,180,180),2,nil,0.5,nil,vec(0,90),120)
+physBone:setPreset("PhysEar",vec(0,180,180),2,nil,0.5,nil,vec(0,90),120)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
