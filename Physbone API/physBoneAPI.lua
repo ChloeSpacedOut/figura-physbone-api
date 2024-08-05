@@ -42,24 +42,6 @@ local physBoneBase = {
 		function(self)
 			return self.gravity
 		end,
-	remove =
-		function(self)
-			local path = self.path
-			boneID = 0
-			local newIndex = {}
-			for k,v in pairs(physBoneIndex) do
-				if v ~= ID then
-					boneID = boneID + 1
-					newIndex[boneID] = v
-				end
-			end
-			physBoneIndex = newIndex
-			physBone[ID] = nil
-			for k,v in pairs(path:getChildren()) do
-				v:setRot(v:getRot())
-			end
-			path:setRot(0,0,0)
-		end,
 	setSpringForce =
 		function(self,data)
 			self.springForce = data
@@ -136,6 +118,26 @@ local physBoneBase = {
 					self[funct](self,preset[v])
 				end
 			end
+			return self
+		end,
+	remove =
+		function(self)
+			local path = self.path
+			local ID = self.ID
+			boneID = 0
+			local newIndex = {}
+			for k,v in pairs(physBoneIndex) do
+				if v ~= ID then
+					boneID = boneID + 1
+					newIndex[boneID] = v
+				end
+			end
+			physBoneIndex = newIndex
+			physBone[ID] = nil
+			for k,v in pairs(path:getChildren()) do
+				v:setRot(v:getRot())
+			end
+			path:setRot(0,0,0)
 		end
 }
 local physBoneMT = {__index=physBoneBase}
