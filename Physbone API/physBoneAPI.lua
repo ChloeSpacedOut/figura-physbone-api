@@ -1,4 +1,4 @@
--- Physbone 2.0 pre-release 1 By ChloeSpacedOut <3
+-- Physbone 2.0 pre-release 2 By ChloeSpacedOut <3
 -- Some funny additions made by Superpowers04 :3
 local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
