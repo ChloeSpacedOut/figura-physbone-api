@@ -342,6 +342,7 @@ events[renderFunction]:register(function (delta,context)
 
 		-- Pendulum logic
 		local pendulumBase =  worldPartMat:apply()
+		if pendulumBase.x ~= pendulumBase.x then return end -- avoid physics breaking if partToWorldMatrix returns NaN
 		local velocity = (curPhysBone.pos - curPhysBone.lastPos) / lastestDeltaTime / ((curPhysBone.simSpeed * curPhysBone.mass)/100)
 
 		-- Air resistance
