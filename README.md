@@ -79,11 +79,11 @@ myPhysBone = models.model.group:getPhysBone()
 ```
 ## PhysBoneAPI
 ### setPreset()
-`<physBoneAPI>:setPreset(String ID, Number gravity, Number airResistance, Number simSpeed, Vector2 equilibrium, Number springForce, Vector3 rotMod) → Returns nil`
+`<physBoneAPI>:setPreset(String ID, Vector3 rotMod, Number mass, Number gravity, Number airResistance, Number simSpeed, Vector2 equilibrium, Number springForce, Vector3 force, Vector3 vecMod) → Returns nil`
 
 Sets the default values of a preset. Can also create a new preset by entering a unique ID. By running this function pre-init, physBone can check for prefixes in your blockbench model and generate physBones using this preset. Your ID is used at a prefix. If a a preset value as `nil`, it will use the default `physBone` value.
 ```lua
-physBone:setPreset("physZeroGrav",0,0)
+physBone:setPreset("physZeroGrav",nil,nil,0)
 ```
 ### removePreset()
 `<physBoneAPI>:removePreset(String ID) → Returns nil`
