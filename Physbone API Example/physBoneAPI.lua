@@ -107,12 +107,21 @@ local physBoneBase = {
 		function(self)
 			return self.vecMod
 		end,
+	setBounceClamp =
+		function(self,data)
+			self.bounceClamp = data
+			return self
+		end,
+	getBounceClamp =
+		function(self)
+			return self.bounceClamp
+		end,
 	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
 			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
-			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod"} do
+			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","bounceClamp"} do
 				if preset[v] then
 					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
 					self[funct](self,preset[v])
@@ -143,10 +152,10 @@ local physBoneBase = {
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -166,7 +175,8 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 		equilibrium = equilibrium,
 		springForce = springForce,
 		force = force,
-		vecMod = vecMod
+		vecMod = vecMod,
+		bounceClamp = bounceClamp
 	},physBoneMT)
 end
 
@@ -206,7 +216,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.bounceClamp,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -226,10 +236,10 @@ physBone.getPhysBone = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp)
 	local presetCache = {}
-	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1)}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, bounceClamp = bounceClamp}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), bounceClamp = {false,false,false}}
 	for valID, fallbackVal in pairs(fallbacks) do
 		presetVal = references[valID]
 		if presetVal then
@@ -356,6 +366,7 @@ local renderFunction = "render"
 local deg = math.deg
 local atan2 = math.atan2
 local asin = math.asin
+local zeroVec = vec(0,0,0)
 local invalidContexts = {
 	PAPERDOLL = true,
 	MINECRAFT_GUI = true,
@@ -376,6 +387,7 @@ events[renderFunction]:register(function (delta,context)
 	for _,curPhysBoneID in pairs(physBoneIndex) do
 		curPhysBone = physBone[curPhysBoneID]
 		local worldPartMat = curPhysBone.path:partToWorldMatrix()
+		local parentWorldPartMat = curPhysBone.path:getParent():partToWorldMatrix()
 
 		-- Pendulum logic
 		local pendulumBase =  worldPartMat:apply()
@@ -392,23 +404,48 @@ events[renderFunction]:register(function (delta,context)
 		-- Spring force
 		if curPhysBone.springForce ~= 0 then
 			local equalib = curPhysBone.equilibrium
-			local relativeDirMat = curPhysBone.path:getParent():partToWorldMatrix():copy() * matrices.mat4():rotate(equalib.y,equalib.x,0)
+			local relativeDirMat = parentWorldPartMat:copy() * matrices.mat4():rotate(equalib.y,equalib.x,0)
 			local reliveDir = relativeDirMat:applyDir(0,0,-1):normalized()
 			local springForce = reliveDir * curPhysBone.springForce
 			velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
 		end
 
 		-- Custom force
-		if curPhysBone.force ~= vec(0,0,0) then
+		if curPhysBone.force ~= zeroVec then
 			velocity = velocity + curPhysBone.force * lasterDeltaTime / curPhysBone.mass^2
 		end
 
 		-- Gravity
 		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime / curPhysBone.mass
 
-		-- Finalise physics
-		curPhysBone.lastPos = curPhysBone.pos:copy()
+		-- Clamp bounce
 		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
+		local nextPos = pendulumBase + direction:normalized()
+		local reliveDir = parentWorldPartMat:copy():applyDir(0,0,-1):normalized()
+		local relativePos = matrices.mat4():translate(direction:normalized()) * parentWorldPartMat
+		local lastPos = curPhysBone.pos:copy()
+		for k,v in pairs(curPhysBone.bounceClamp) do
+			if v then
+				local hasCollided = false
+				if (nextPos[k] < (pendulumBase[k] + v[1])) then
+					velocity[k] = -velocity[k] * 1
+					nextPos[k] = (pendulumBase[k] + v[1])
+					hasCollided = true
+				elseif (nextPos[k] > (pendulumBase[k] + v[2])) then
+					velocity[k] = -velocity[k] * 1
+					nextPos[k] = (pendulumBase[k] + v[2])
+					hasCollided = true
+				end
+				if hasCollided then
+					lastPos = nextPos
+					direction = (nextPos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
+				end
+			end
+		end
+		
+
+		-- Finalise physics
+		curPhysBone.lastPos = lastPos
 		curPhysBone.pos = pendulumBase + direction:normalized()
 
 		-- Rotation calcualtion
