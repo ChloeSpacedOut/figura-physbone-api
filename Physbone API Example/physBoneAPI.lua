@@ -161,12 +161,13 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 	assert(path,'error making physBone: part is null!')
 	local ID = name or path:getName()
 	local pos = path:partToWorldMatrix():apply()
+	local velocity = vec(0,0,0)
 	return setmetatable({
 		index=nil,
 		ID = ID,
 		path = path,
 		pos = pos,
-		lastPos = pos:copy(),
+		velocity = velocity,
 		rotMod = rotMod,
 		mass = mass,
 		gravity = gravity,
@@ -372,6 +373,10 @@ local invalidContexts = {
 	MINECRAFT_GUI = true,
 	FIGURA_GUI = true
 }
+
+-- TEMP 
+local tempPlane = {vec(0,-0.5,0),vec(0,1,0)}
+
 -- Render function
 events[renderFunction]:register(function (delta,context)
 	if(invalidContexts[context] or client:isPaused()) then
@@ -392,7 +397,7 @@ events[renderFunction]:register(function (delta,context)
 		-- Pendulum logic
 		local pendulumBase =  worldPartMat:apply()
 		if pendulumBase.x ~= pendulumBase.x then return end -- avoid physics breaking if partToWorldMatrix returns NaN
-		local velocity = (curPhysBone.pos - curPhysBone.lastPos) / lastestDeltaTime / ((curPhysBone.simSpeed * curPhysBone.mass)/100)
+		local velocity = curPhysBone.velocity / lastestDeltaTime / ((curPhysBone.simSpeed * curPhysBone.mass)/100)
 
 		-- Air resistance
 		local airResistanceFactor = curPhysBone.airResistance
@@ -421,32 +426,25 @@ events[renderFunction]:register(function (delta,context)
 		-- Clamp bounce
 		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
 		local nextPos = pendulumBase + direction:normalized()
-		local reliveDir = parentWorldPartMat:copy():applyDir(0,0,-1):normalized()
-		local relativePos = matrices.mat4():translate(direction:normalized()) * parentWorldPartMat
-		local lastPos = curPhysBone.pos:copy()
-		for k,v in pairs(curPhysBone.bounceClamp) do
-			if v then
-				local hasCollided = false
-				if (nextPos[k] < (pendulumBase[k] + v[1])) then
-					velocity[k] = -velocity[k] * 1
-					nextPos[k] = (pendulumBase[k] + v[1])
-					hasCollided = true
-				elseif (nextPos[k] > (pendulumBase[k] + v[2])) then
-					velocity[k] = -velocity[k] * 1
-					nextPos[k] = (pendulumBase[k] + v[2])
-					hasCollided = true
-				end
-				if hasCollided then
-					lastPos = nextPos
-					direction = (nextPos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
-				end
-			end
+		local physBoneVel = nextPos - curPhysBone.pos
+		local planeNormal = tempPlane[2]:normalized()
+		local hasCollided = false
+		local diff = nextPos - (tempPlane[1] + pendulumBase)
+		local distance = diff:dot(planeNormal) / planeNormal:length()
+		--log(velocity)
+		if distance <= 0 then
+			hasCollided = true
 		end
 		
 
 		-- Finalise physics
-		curPhysBone.lastPos = lastPos
-		curPhysBone.pos = pendulumBase + direction:normalized()
+		if not hasCollided then
+			curPhysBone.velocity = nextPos - curPhysBone.pos
+			curPhysBone.pos = pendulumBase + direction:normalized()
+		else
+			curPhysBone.velocity = (velocity - 2.61 * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
+			curPhysBone.pos = nextPos - distance * planeNormal
+		end
 
 		-- Rotation calcualtion
 		local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
