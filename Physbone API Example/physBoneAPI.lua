@@ -107,21 +107,12 @@ local physBoneBase = {
 		function(self)
 			return self.vecMod
 		end,
-	setBounceClamp =
-		function(self,data)
-			self.bounceClamp = data
-			return self
-		end,
-	getBounceClamp =
-		function(self)
-			return self.bounceClamp
-		end,
 	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
 			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
-			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","bounceClamp"} do
+			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod"} do
 				if preset[v] then
 					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
 					self[funct](self,preset[v])
@@ -152,10 +143,10 @@ local physBoneBase = {
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -176,8 +167,7 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 		equilibrium = equilibrium,
 		springForce = springForce,
 		force = force,
-		vecMod = vecMod,
-		bounceClamp = bounceClamp
+		vecMod = vecMod
 	},physBoneMT)
 end
 
@@ -217,7 +207,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.bounceClamp,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -237,10 +227,10 @@ physBone.getPhysBone = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,bounceClamp)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
 	local presetCache = {}
-	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, bounceClamp = bounceClamp}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), bounceClamp = {false,false,false}}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1)}
 	for valID, fallbackVal in pairs(fallbacks) do
 		presetVal = references[valID]
 		if presetVal then
