@@ -2,8 +2,10 @@
 -- Some funny additions made by Superpowers04 :3
 local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
-	allowDuplicates=false,
-	children={},index={}}
+	allowDuplicates = false,
+	children = {},
+	index = {},
+}
 local physBoneIndex = physBone.index
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
@@ -317,11 +319,46 @@ function physBone.addDebugParts(part,preset)
 	end
 end
 
--- Pendulum object initialization
+local function getParents(part,parentsTable)
+	local parent = part:getParent()
+	if not parent then return parentsTable end
+	parentsTable[#parentsTable + 1] = parent
+	getParents(parent,parentsTable)
+	return parentsTable
+end
+
+local function updateCollider(part)
+	local ID = part:getName()
+	local parents = getParents(part,{part})
+	local nbtIndex = avatar:getNBT()
+	for i = #parents, 1, -1 do
+		for k,v in pairs(nbtIndex) do
+			if v.name == parents[i]:getName() then
+				if v.chld then 
+					nbtIndex = v.chld
+				else
+					nbtIndex = v
+				end
+			end
+		end
+	end
+	logTable(nbtIndex,2)
+	assert(nbtIndex.cube_data,"error making collider '"..ID.."'. This part isn't a cube")
+	if next(nbtIndex.cube_data) == nil then
+		error("error making collider '"..ID.."'. This cube either has no texture applied to it in Blockbench or has all faces disabled")
+	end
+end
+
+-- Generate physBones and colliders from model parts
 events.entity_init:register(function()
 	local function findCustomParentTypes(path)
 		for _,part in pairs(path:getChildren()) do
 			local ID = part:getName()
+			local ID_sub = ID:sub(0,8)
+			if ID_sub == "collider" or ID_sub == "Collider" then
+				updateCollider(part)
+				-- I can't do anything until I have a way of storing collider related data ._.
+			end
 			for presetID,preset in pairs(physBonePresets) do
 				if ID:sub(0,#presetID) == presetID then
 					physBone.newPhysBone(part,preset)
@@ -333,7 +370,7 @@ events.entity_init:register(function()
 		end
 	end
 	findCustomParentTypes(models)
-end,'PHYSBONE.pendulumObjectInit')
+end,'PHYSBONE.generateFromModelParts')
 
 -- Debug keybind
 local debugKeybind = keybinds:newKeybind("Toggle PhysBone Debug Mode","key.keyboard.grave.accent")
