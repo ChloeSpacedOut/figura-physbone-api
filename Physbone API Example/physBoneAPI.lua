@@ -4,6 +4,7 @@ local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
 	allowDuplicates = false,
 	children = {},
+	collider = {},
 	index = {},
 }
 local physBoneIndex = physBone.index
@@ -144,6 +145,11 @@ local physBoneBase = {
 }
 local physBoneMT = {__index=physBoneBase}
 
+-- Temp collider table
+local colliderBase = {
+
+}
+
 -- Internal Function: Returns physbone metatable from set values
 physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name)
 	if(self ~= physBone) then
@@ -228,6 +234,69 @@ physBone.getPhysBone = function(self,part)
 	return physBone[ID]
 end
 
+-- Internal function to get part parents
+local function getParents(part,parentsTable)
+	local parent = part:getParent()
+	if not parent then return parentsTable end
+	parentsTable[#parentsTable + 1] = parent
+	getParents(parent,parentsTable)
+	return parentsTable
+end
+
+-- Creates a new collider
+physBone.newCollider = function(self,part)
+	assert(part,'error making collider: part is null!')
+	local ID = part:getName()
+	assert(not physBone.collider[ID],'error making collider: this collider "'..ID..'" already exists')
+	local parents = getParents(part,{part})
+	local nbtIndex = avatar:getNBT()
+	for i = #parents, 1, -1 do
+		for k,v in pairs(nbtIndex) do
+			if v.name == parents[i]:getName() then
+				if v.chld then 
+					nbtIndex = v.chld
+				else
+					nbtIndex = v
+				end
+			end
+		end
+	end
+	assert(nbtIndex.cube_data,"error making collider '"..ID.."'. This part isn't a cube")
+	if next(nbtIndex.cube_data) == nil then
+		error("error making collider '"..ID.."'. This cube either has no texture applied to it in Blockbench or has all faces disabled")
+	end
+
+	local t = nbtIndex.t
+	local f = nbtIndex.f
+	local piv = nbtIndex.piv
+	local rot = nbtIndex.rot
+	if not t then t = {0,0,0} end
+	if not f then f = {0,0,0} end
+	if not piv then piv = {0,0,0} end
+	if not rot then rot = {0,0,0} end
+	t = vec(t[1],t[2],t[3])
+	f = vec(f[1],f[2],f[3])
+	piv = vec(piv[1],piv[2],piv[3])
+
+	local offset = t - piv
+	local size = t - f
+
+	local faces = {}
+	for k,v in pairs(nbtIndex.cube_data) do
+		faces[k] = true
+	end
+
+	-- temp code for steph to replace
+
+	physBone.collider[ID] = {
+		ID = ID,
+		part = part,
+		offset = offset,
+		size = size,
+		faces = faces
+	}
+end
+
 -- Creates a new or sets the value of an existing preset
 physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
 	local presetCache = {}
@@ -294,7 +363,7 @@ function physBone.addDebugParts(part,preset)
 		directionGroup:newSprite("line"..k)
 			:setTexture(testTexture,1,1)
 			:setRenderType("EMISSIVE_SOLID")
-			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,3,0.5):rotate(0,k*90,0) * 0.12)
+			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,16*math.worldScale,0.5):rotate(0,k*90,0) * 0.12)
 	end
 	directionGroup:setRot(-preset.rotMod)
 	local springForceGroup = part:newPart("PB_Debug_SpringForce")
@@ -319,36 +388,6 @@ function physBone.addDebugParts(part,preset)
 	end
 end
 
-local function getParents(part,parentsTable)
-	local parent = part:getParent()
-	if not parent then return parentsTable end
-	parentsTable[#parentsTable + 1] = parent
-	getParents(parent,parentsTable)
-	return parentsTable
-end
-
-local function updateCollider(part)
-	local ID = part:getName()
-	local parents = getParents(part,{part})
-	local nbtIndex = avatar:getNBT()
-	for i = #parents, 1, -1 do
-		for k,v in pairs(nbtIndex) do
-			if v.name == parents[i]:getName() then
-				if v.chld then 
-					nbtIndex = v.chld
-				else
-					nbtIndex = v
-				end
-			end
-		end
-	end
-	logTable(nbtIndex,2)
-	assert(nbtIndex.cube_data,"error making collider '"..ID.."'. This part isn't a cube")
-	if next(nbtIndex.cube_data) == nil then
-		error("error making collider '"..ID.."'. This cube either has no texture applied to it in Blockbench or has all faces disabled")
-	end
-end
-
 -- Generate physBones and colliders from model parts
 events.entity_init:register(function()
 	local function findCustomParentTypes(path)
@@ -356,8 +395,7 @@ events.entity_init:register(function()
 			local ID = part:getName()
 			local ID_sub = ID:sub(0,8)
 			if ID_sub == "collider" or ID_sub == "Collider" then
-				updateCollider(part)
-				-- I can't do anything until I have a way of storing collider related data ._.
+				physBone:newCollider(part)
 			end
 			for presetID,preset in pairs(physBonePresets) do
 				if ID:sub(0,#presetID) == presetID then
@@ -401,14 +439,51 @@ local invalidContexts = {
 	FIGURA_GUI = true
 }
 
--- TEMP 
-local tempPlane = {vec(0,-0.5,0),vec(0,1,0)}
-
 -- Render function
 events[renderFunction]:register(function (delta,context)
 	if(invalidContexts[context] or client:isPaused()) then
 		return
 	end
+	-- Collider setup
+	local colliderGroups = {}
+	for colID,collider in pairs(physBone.collider) do
+		colliderGroups[colID] = {}
+		local colGroup = colliderGroups[colID]
+		local colMatrix = collider.part:partToWorldMatrix()
+		local partPos = colMatrix:apply()
+		local size = collider.size
+		local colTransMat = colMatrix:copy():translate(-partPos)
+		local offsetMat = matrices.mat4():translate(collider.offset)
+		local colNormalX = colMatrix:applyDir(vec(1,0,0)):normalize()
+		local colNormalY = colMatrix:applyDir(vec(0,1,0)):normalize()
+		local colNormalZ = colMatrix:applyDir(vec(0,0,1)):normalize()
+		local faces = collider.faces
+		if faces.s then
+			local colPos = (colTransMat * offsetMat:copy()):translate(partPos):apply()
+			colGroup.s = {pos = colPos, normals = {colNormalX,colNormalY,colNormalZ}, size = vec(size.x,size.y,size.z)}
+		end
+		if faces.n then
+			local colPos = (colTransMat * offsetMat:copy():translate(-size)):translate(partPos):apply()
+			colGroup.n = {pos = colPos, normals = {-colNormalX,-colNormalY,-colNormalZ}, size = vec(size.x,size.y,size.z)}
+		end
+		if faces.e then
+			local colPos = (colTransMat * offsetMat:copy():translate(-size * vec(0,1,0))):translate(partPos):apply()
+			colGroup.e = {pos = colPos, normals = {colNormalZ,-colNormalY,colNormalX}, size = vec(size.z,size.y,size.x)}
+		end
+		if faces.w then
+			local colPos = (colTransMat * offsetMat:copy():translate(-size * vec(1,0,1))):translate(partPos):apply()
+			colGroup.w = {pos = colPos, normals = {-colNormalZ,colNormalY,-colNormalX}, size = vec(size.z,size.y,size.x)}
+		end
+		if faces.u then
+			local colPos = (colTransMat * offsetMat:copy():translate(-size * vec(0,0,1))):translate(partPos):apply()
+			colGroup.u = {pos = colPos, normals = {colNormalX,-colNormalZ,colNormalY}, size = vec(size.x,size.z,size.y)}
+		end
+		if faces.d then
+			local colPos = (colTransMat * offsetMat:copy():translate(-size * vec(1,1,0))):translate(partPos):apply()
+			colGroup.d = {pos = colPos, normals = {-colNormalX,colNormalZ,-colNormalY}, size = vec(size.x,size.z,size.y)}
+		end
+	end
+
 	-- Time calculations
 	local time = (physClock + delta)
 	local deltaTime = time - lastDelta
@@ -450,26 +525,42 @@ events[renderFunction]:register(function (delta,context)
 		-- Gravity
 		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime / curPhysBone.mass
 
-		-- Clamp bounce
+		-- Collisions
 		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
 		local nextPos = pendulumBase + direction:normalized()
-		local physBoneVel = nextPos - curPhysBone.pos
-		local planeNormal = tempPlane[2]:normalized()
 		local hasCollided = false
-		local diff = nextPos - (tempPlane[1] + pendulumBase)
-		local distance = diff:dot(planeNormal) / planeNormal:length()
-		--log(velocity)
-		if distance <= 0 then
-			hasCollided = true
+		local planeNormal
+		local distance
+		for groupID,group in pairs(colliderGroups) do
+			for _,face in pairs(group) do
+				local normalX = face.normals[1]
+				local normalY = face.normals[2]
+				local normalZ = face.normals[3]
+				local diff = nextPos - face.pos
+				local distanceX = diff:dot(normalX) / normalX:length()
+				local distanceY = diff:dot(normalY) / normalY:length()
+				local distanceZ = diff:dot(normalZ) / normalZ:length()
+				local worldScale = 16*math.worldScale
+				local pendulumThickness = 0/worldScale
+				local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
+				local penetration = (distanceZ + pendulumThickness) / size.z
+				local isXCollided = distanceZ <= 0 and -size.z <= distanceZ
+				local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
+				local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
+				if isXCollided and isYCollided and isZCollided then
+					planeNormal = normalZ
+					distance = distanceZ
+					hasCollided = true
+				end
+			end
 		end
-		
 
 		-- Finalise physics
 		if not hasCollided then
 			curPhysBone.velocity = nextPos - curPhysBone.pos
 			curPhysBone.pos = pendulumBase + direction:normalized()
-		else
-			curPhysBone.velocity = (velocity - 2.61 * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
+		else -- 2.61
+			curPhysBone.velocity = (velocity - 2 * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
 			curPhysBone.pos = nextPos - distance * planeNormal
 		end
 
