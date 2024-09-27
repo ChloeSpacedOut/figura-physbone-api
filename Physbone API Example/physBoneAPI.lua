@@ -110,12 +110,24 @@ local physBoneBase = {
 		function(self)
 			return self.vecMod
 		end,
+	setLength =
+		function(self,data)
+			self.length = data
+			if host:isHost() and self.path.PB_Debug_Direction then
+				self.path.PB_Debug_Direction.child:setScale(1,self.length,1)
+			end
+			return self
+		end,
+	getLength =
+		function(self)
+			return self.length
+		end,
 	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
 			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
-			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod"} do
+			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","length"} do
 				if preset[v] then
 					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
 					self[funct](self,preset[v])
@@ -151,10 +163,10 @@ local colliderBase = {
 }
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -175,7 +187,8 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 		equilibrium = equilibrium,
 		springForce = springForce,
 		force = force,
-		vecMod = vecMod
+		vecMod = vecMod,
+		length = length
 	},physBoneMT)
 end
 
@@ -215,7 +228,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.length,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -298,10 +311,10 @@ physBone.newCollider = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length)
 	local presetCache = {}
-	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1)}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, length = length}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), length = 16}
 	for valID, fallbackVal in pairs(fallbacks) do
 		presetVal = references[valID]
 		if presetVal then
@@ -349,27 +362,28 @@ end
 --
 
 -- Generates a physBone's debug model
-local testTexture = textures:newTexture("test",1,1):setPixel(0,0,vec(1,1,1))
+local debugTexture = textures:newTexture("test",1,1):setPixel(0,0,vec(1,1,1))
 function physBone.addDebugParts(part,preset)
 	local pivotGroup = part:newPart("PB_Debug_Pivot","Camera")
 	pivotGroup:newSprite("pivot")
-		:setTexture(testTexture,1,1)
+		:setTexture(debugTexture,1,1)
 		:setColor(1,0,0)
 		:setRenderType("EMISSIVE_SOLID")
 		:setMatrix(matrices.mat4():translate(0.5,0.5,0.5):scale(0.5,0.5,0.5):rotate(0,0,0) * 0.1)
 
-	local directionGroup = part:newPart("PB_Debug_Direction")
-	for k = 3, 6 do
+	local directionGroup = part:newPart("PB_Debug_Direction"):newPart("child")
+	for k = 0, 3 do
 		directionGroup:newSprite("line"..k)
-			:setTexture(testTexture,1,1)
+			:setTexture(debugTexture,1,1)
 			:setRenderType("EMISSIVE_SOLID")
-			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,16*math.worldScale,0.5):rotate(0,k*90,0) * 0.12)
+			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,math.worldScale,0.5):rotate(0,k*90,0) * 0.12)
 	end
+	directionGroup:setScale(1,preset.length,1)
 	directionGroup:setRot(-preset.rotMod)
 	local springForceGroup = part:newPart("PB_Debug_SpringForce")
-	for k = 3, 6 do
+	for k = 0, 3 do
 		springForceGroup:newSprite("line"..k)
-			:setTexture(testTexture,1,1)
+			:setTexture(debugTexture,1,1)
 			:setColor(0,0,1)
 			:setRenderType("EMISSIVE_SOLID")
 			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.25,3,0.25):rotate(0,k*90,0) * 0.11)
@@ -527,7 +541,7 @@ events[renderFunction]:register(function (delta,context)
 
 		-- Collisions
 		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
-		local nextPos = pendulumBase + direction:normalized()
+		local nextPos = pendulumBase + direction:normalized() * (curPhysBone.length / 16)
 		local hasCollided = false
 		local planeNormal
 		local distance
@@ -558,7 +572,7 @@ events[renderFunction]:register(function (delta,context)
 		-- Finalise physics
 		if not hasCollided then
 			curPhysBone.velocity = nextPos - curPhysBone.pos
-			curPhysBone.pos = pendulumBase + direction:normalized()
+			curPhysBone.pos = nextPos
 		else -- 2.61
 			curPhysBone.velocity = (velocity - 2 * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
 			curPhysBone.pos = nextPos - distance * planeNormal
