@@ -122,12 +122,48 @@ local physBoneBase = {
 		function(self)
 			return self.length
 		end,
+	setNodeStart =
+		function(self,data)
+			self.nodeStart = data
+			return self
+		end,
+	getNodeStart =
+		function(self)
+			return self.nodeStart
+		end,
+	setNodeEnd =
+		function(self,data)
+			self.nodeEnd = data
+			return self
+		end,
+	getNodeEnd =
+		function(self)
+			return self.nodeEnd
+		end,
+	setNodeDensity =
+		function(self,data)
+			self.nodeDensity = data
+			return self
+		end,
+	getNodeDensity =
+		function(self)
+			return self.nodeDensity
+		end,
+	setNodeRadius =
+		function(self,data)
+			self.nodeRadius = data
+			return self
+		end,
+	getNodeRadiusy =
+		function(self)
+			return self.nodeRadius
+		end,
 	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
 			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
-			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","length"} do
+			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","length","nodeStart","nodeEnd","nodeDensity","nodeRadius"} do
 				if preset[v] then
 					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
 					self[funct](self,preset[v])
@@ -163,10 +199,10 @@ local colliderBase = {
 }
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -188,7 +224,11 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 		springForce = springForce,
 		force = force,
 		vecMod = vecMod,
-		length = length
+		length = length,
+		nodeStart = nodeStart,
+		nodeEnd = nodeEnd,
+		nodeDensity = nodeDensity,
+		nodeRadius = nodeRadius
 	},physBoneMT)
 end
 
@@ -228,7 +268,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.length,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.length,preset.nodeStart,preset.nodeEnd,preset.nodeDensity,preset.nodeRadius,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -311,10 +351,10 @@ physBone.newCollider = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius)
 	local presetCache = {}
-	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, length = length}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), length = 16}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, length = length, nodeStart = nodeStart, nodeEnd = nodeEnd, nodeDensity = nodeDensity, nodeRadius = nodeRadius}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), length = 16, nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0}
 	for valID, fallbackVal in pairs(fallbacks) do
 		presetVal = references[valID]
 		if presetVal then
@@ -458,6 +498,14 @@ events[renderFunction]:register(function (delta,context)
 	if(invalidContexts[context] or client:isPaused()) then
 		return
 	end
+
+	-- Time calculations
+	local time = (physClock + delta)
+	local deltaTime = time - lastDelta
+
+	-- If world time / render somehow runs twice, don't run
+	if deltaTime == 0 then return end
+
 	-- Collider setup
 	local colliderGroups = {}
 	for colID,collider in pairs(physBone.collider) do
@@ -498,13 +546,6 @@ events[renderFunction]:register(function (delta,context)
 		end
 	end
 
-	-- Time calculations
-	local time = (physClock + delta)
-	local deltaTime = time - lastDelta
-
-
-	-- If world time / render somehow runs twice, don't run
-	if deltaTime == 0 then return end
 	for _,curPhysBoneID in pairs(physBoneIndex) do
 		curPhysBone = physBone[curPhysBoneID]
 		local worldPartMat = curPhysBone.path:partToWorldMatrix()
@@ -540,36 +581,43 @@ events[renderFunction]:register(function (delta,context)
 		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime / curPhysBone.mass
 
 		-- Collisions
-		local direction = (curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase
-		local nextPos = pendulumBase + direction:normalized() * (curPhysBone.length / 16)
+		local direction = ((curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase):normalized()
+		local nodeDir = direction
 		local hasCollided = false
 		local planeNormal
 		local distance
-		for groupID,group in pairs(colliderGroups) do
-			for _,face in pairs(group) do
-				local normalX = face.normals[1]
-				local normalY = face.normals[2]
-				local normalZ = face.normals[3]
-				local diff = nextPos - face.pos
-				local distanceX = diff:dot(normalX) / normalX:length()
-				local distanceY = diff:dot(normalY) / normalY:length()
-				local distanceZ = diff:dot(normalZ) / normalZ:length()
-				local worldScale = 16*math.worldScale
-				local pendulumThickness = 0/worldScale
-				local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
-				local penetration = (distanceZ + pendulumThickness) / size.z
-				local isXCollided = distanceZ <= 0 and -size.z <= distanceZ
-				local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
-				local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
-				if isXCollided and isYCollided and isZCollided then
-					planeNormal = normalZ
-					distance = distanceZ
-					hasCollided = true
+		for node = 1, curPhysBone.nodeDensity do
+			local nodeLength = curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart
+			local nodePos = pendulumBase + nodeDir * (nodeLength / 16)
+			for groupID,group in pairs(colliderGroups) do
+				for _,face in pairs(group) do
+					local normalX = face.normals[1]
+					local normalY = face.normals[2]
+					local normalZ = face.normals[3]
+					local diff = nodePos - face.pos
+					local distanceX = diff:dot(normalX) / normalX:length()
+					local distanceY = diff:dot(normalY) / normalY:length()
+					local distanceZ = diff:dot(normalZ) / normalZ:length()
+					local worldScale = 16*math.worldScale
+					local pendulumThickness = 0/worldScale
+					local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
+					local penetration = (distanceZ + pendulumThickness) / size.z
+					local radius = curPhysBone.nodeRadius / 16 / math.worldScale
+					local isXCollided = (distanceZ - radius) <= 0 and -size.z <= distanceZ
+					local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
+					local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
+					if isXCollided and isYCollided and isZCollided then
+						planeNormal = normalZ
+						distance = distanceZ - radius
+						hasCollided = true
+						nodeDir = (nodePos - pendulumBase):normalized()
+					end
 				end
 			end
 		end
 
 		-- Finalise physics
+		local nextPos = pendulumBase + direction * (curPhysBone.length / 16)
 		if not hasCollided then
 			curPhysBone.velocity = nextPos - curPhysBone.pos
 			curPhysBone.pos = nextPos
