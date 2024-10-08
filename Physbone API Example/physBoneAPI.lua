@@ -157,7 +157,7 @@ local physBoneBase = {
 			self.nodeRadius = data
 			return self
 		end,
-	getNodeRadiusy =
+	getNodeRadius =
 		function(self)
 			return self.nodeRadius
 		end,
