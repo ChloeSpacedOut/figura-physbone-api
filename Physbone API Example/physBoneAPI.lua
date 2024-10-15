@@ -12,8 +12,12 @@ local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
 local physBonePresets = {}
 local debugMode = false
+local whiteTexture = textures:newTexture("white",1,1)
+	:setPixel(0,0,vec(1,1,1))
 local colliderTexture = textures:newTexture("collider",1,1)
 	:setPixel(0,0,vec(0,0,0,0))
+local nodeTexture = textures:newTexture("node",1,1)
+	:setPixel(0,0,vec(0,0,1))
 
 
 -- Physbone metatable
@@ -117,7 +121,7 @@ local physBoneBase = {
 		function(self,data)
 			self.length = data
 			if host:isHost() and self.path.PB_Debug_Direction then
-				self.path.PB_Debug_Direction.child:setScale(1,self.length,1)
+				self.path.PB_Debug_Direction.child:setScale(1,data,1)
 			end
 			return self
 		end,
@@ -128,6 +132,11 @@ local physBoneBase = {
 	setNodeStart =
 		function(self,data)
 			self.nodeStart = data
+			if host:isHost() and self.path.PB_Debug_NodeRadius then
+				self.path.PB_Debug_NodeRadius:remove()
+				physBone.addDebugNodes(self.path,data,self.nodeEnd,self.nodeRadius,self.nodeDensity)
+				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
+			end
 			return self
 		end,
 	getNodeStart =
@@ -137,6 +146,11 @@ local physBoneBase = {
 	setNodeEnd =
 		function(self,data)
 			self.nodeEnd = data
+			if host:isHost() and self.path.PB_Debug_NodeRadius then
+				self.path.PB_Debug_NodeRadius:remove()
+				physBone.addDebugNodes(self.path,self.nodeStart,data,self.nodeRadius,self.nodeDensity)
+				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
+			end
 			return self
 		end,
 	getNodeEnd =
@@ -146,6 +160,11 @@ local physBoneBase = {
 	setNodeDensity =
 		function(self,data)
 			self.nodeDensity = data
+			if host:isHost() and self.path.PB_Debug_NodeRadius then
+				self.path.PB_Debug_NodeRadius:remove()
+				physBone.addDebugNodes(self.path,self.nodeStart,self.nodeEnd,self.nodeRadius,data)
+				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
+			end
 			return self
 		end,
 	getNodeDensity =
@@ -155,6 +174,11 @@ local physBoneBase = {
 	setNodeRadius =
 		function(self,data)
 			self.nodeRadius = data
+			if host:isHost() and self.path.PB_Debug_NodeRadius then
+				self.path.PB_Debug_NodeRadius:remove()
+				physBone.addDebugNodes(self.path,self.nodeStart,self.nodeEnd,data,self.nodeDensity)
+				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
+			end
 			return self
 		end,
 	getNodeRadius =
@@ -205,11 +229,6 @@ local physBoneBase = {
 		end
 }
 local physBoneMT = {__index=physBoneBase}
-
--- Temp collider table
-local colliderBase = {
-
-}
 
 -- Internal Function: Returns physbone metatable from set values
 physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name)
@@ -417,12 +436,85 @@ function figuraMetatables.ModelPart:__index(key)
 end
 --
 
+-- Generates sphere mesh
+function physBone.newSphere(part,ID)
+	for i = 0, 9 do
+		local faces = {}
+		for j = 1,5 do
+			faces["face"..j] = part:newSprite(ID..i..j)
+			:setTexture(nodeTexture,1,1)
+			:setUVPixels(2,2)
+		end
+		local face1,face2,face3,face4,face5 = faces.face1,faces.face2,faces.face3,faces.face4,faces.face5
+
+		local normal1 = vec(0,4.7023,-1.5279):normalize()
+		face1:getVertices()[1]:setPos(0,8,0):setNormal(normal1)
+		face1:getVertices()[2]:setPos(0,8,0):setNormal(normal1)
+		face1:getVertices()[3]:setPos(-1.5279,6.4721,-4.7023):setNormal(normal1)
+		face1:getVertices()[4]:setPos(1.5279,6.4721,-4.7023):setNormal(normal1)
+		face1:setRot(0,i*36,0)
+
+		local normal2 = vec(0,2.9062,-4):normalize()
+		face2:getVertices()[1]:setPos(1.5279,6.4721,-4.7023):setNormal(normal2)
+		face2:getVertices()[2]:setPos(-1.5279,6.4721,-4.7023):setNormal(normal2)
+		face2:getVertices()[3]:setPos(-2.4721,2.4721,-7.6085):setNormal(normal2)
+		face2:getVertices()[4]:setPos(2.4721,2.4721,-7.6085):setNormal(normal2)
+		face2:setRot(0,i*36,0)
+
+		local normal3 = vec(0,0,-5):normalize()
+		face3:getVertices()[1]:setPos(2.4721,2.4721,-7.6085):setNormal(normal3)
+		face3:getVertices()[2]:setPos(-2.4721,2.4721,-7.6085):setNormal(normal3)
+		face3:getVertices()[3]:setPos(-2.4721,-2.4721,-7.6085):setNormal(normal3)
+		face3:getVertices()[4]:setPos(2.4721,-2.4721,-7.6085):setNormal(normal3)
+		face3:setRot(0,i*36,0)
+
+		local normal4 = vec(0,-2.9062,-4):normalize()
+		face4:getVertices()[1]:setPos(2.4721,-2.4721,-7.6085):setNormal(normal4)
+		face4:getVertices()[2]:setPos(-2.4721,-2.4721,-7.6085):setNormal(normal4)
+		face4:getVertices()[3]:setPos(-1.5279,-6.4721,-4.7023):setNormal(normal4)
+		face4:getVertices()[4]:setPos(1.5279,-6.4721,-4.7023):setNormal(normal4)
+		face4:setRot(0,i*36,0)
+		
+		local normal5 = vec(0,-4.7023,-1.5279):normalize()
+		face5:getVertices()[1]:setPos(1.5279,-6.4721,-4.7023):setNormal(normal5)
+		face5:getVertices()[2]:setPos(-1.5279,-6.4721,-4.7023):setNormal(normal5)
+		face5:getVertices()[3]:setPos(0,-8,0):setNormal(normal5)
+		face5:getVertices()[4]:setPos(0,-8,0):setNormal(normal5)
+		face5:setRot(0,i*36,0)
+	end
+end
+
+-- Generates physbone debug nodes
+function physBone.addDebugNodes(part,nodeStart,nodeEnd,nodeRadius,nodeDensity)
+	local nodeRadiusGroup = part:newPart("PB_Debug_NodeRadius")
+	if nodeRadius == 0 then
+		for i = 1, nodeDensity do
+			local nodeParent = nodeRadiusGroup:newPart("nodeParent"..i)
+			local nodeLength = nodeEnd * ((nodeEnd - nodeStart) / nodeEnd) * (i  / nodeDensity) + nodeStart
+			nodeParent:setPos(0,0,-nodeLength)
+			local node = nodeParent:newPart("node"..i,"CAMERA")
+			node:newSprite("nodeRadius")
+				:setTexture(nodeTexture,1,1)
+				:setRenderType("EMISSIVE_SOLID")
+				:setMatrix(matrices.mat4():translate(0.5,0.5,0.5):scale(0.5,0.5,0.5):rotate(0,0,0) * 0.1)
+		end
+	else
+		for i = 1, nodeDensity do
+			local nodeParent = nodeRadiusGroup:newPart("nodeParent"..i)
+			local nodeLength = nodeEnd * ((nodeEnd - nodeStart) / nodeEnd) * (i  / nodeDensity) + nodeStart
+			nodeParent:setPos(0,0,-nodeLength)
+			local node = nodeParent:newPart("node"..i)
+			physBone.newSphere(node,"sphere"..i)
+			node:setMatrix(matrices.mat4():translate(0,-30,4):scale(0.125 * nodeRadius):translate(0,30,-4) * 0.1)
+		end
+	end
+end
+
 -- Generates a physBone's debug model
-local debugTexture = textures:newTexture("test",1,1):setPixel(0,0,vec(1,1,1))
 function physBone.addDebugParts(part,preset)
 	local pivotGroup = part:newPart("PB_Debug_Pivot","Camera")
 	pivotGroup:newSprite("pivot")
-		:setTexture(debugTexture,1,1)
+		:setTexture(whiteTexture,1,1)
 		:setColor(1,0,0)
 		:setRenderType("EMISSIVE_SOLID")
 		:setMatrix(matrices.mat4():translate(0.5,0.5,0.5):scale(0.5,0.5,0.5):rotate(0,0,0) * 0.1)
@@ -430,7 +522,7 @@ function physBone.addDebugParts(part,preset)
 	local directionGroup = part:newPart("PB_Debug_Direction"):newPart("child")
 	for k = 0, 3 do
 		directionGroup:newSprite("line"..k)
-			:setTexture(debugTexture,1,1)
+			:setTexture(whiteTexture,1,1)
 			:setRenderType("EMISSIVE_SOLID")
 			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,math.worldScale,0.5):rotate(0,k*90,0) * 0.12)
 	end
@@ -439,7 +531,7 @@ function physBone.addDebugParts(part,preset)
 	local springForceGroup = part:newPart("PB_Debug_SpringForce")
 	for k = 0, 3 do
 		springForceGroup:newSprite("line"..k)
-			:setTexture(debugTexture,1,1)
+			:setTexture(whiteTexture,1,1)
 			:setColor(0,0,1)
 			:setRenderType("EMISSIVE_SOLID")
 			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.25,3,0.25):rotate(0,k*90,0) * 0.11)
@@ -453,7 +545,9 @@ function physBone.addDebugParts(part,preset)
 		:translate(pivot)
 	springForceGroup:setMatrix(mat)
 
-	for k,v in pairs({"PB_Debug_Pivot","PB_Debug_Direction","PB_Debug_SpringForce"}) do
+	physBone.addDebugNodes(part,preset.nodeStart,preset.nodeEnd,preset.nodeRadius,preset.nodeDensity)
+
+	for k,v in pairs({"PB_Debug_Pivot","PB_Debug_Direction","PB_Debug_SpringForce","PB_Debug_NodeRadius"}) do
 		part[v]:setVisible(false)
 	end
 end
@@ -488,6 +582,7 @@ function debugKeybind.press()
 		physBone[boneID].path.PB_Debug_Pivot:setVisible(debugMode)
 		physBone[boneID].path.PB_Debug_Direction:setVisible(debugMode)
 		physBone[boneID].path.PB_Debug_SpringForce:setVisible(debugMode)
+		physBone[boneID].path.PB_Debug_NodeRadius:setVisible(debugMode)
 	end
 	if debugMode then
 		colliderTexture:setPixel(0,0,vec(1,0.5,0)):update()
