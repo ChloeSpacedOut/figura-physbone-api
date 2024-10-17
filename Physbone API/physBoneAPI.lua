@@ -17,7 +17,7 @@ local whiteTexture = textures:newTexture("white",1,1)
 local colliderTexture = textures:newTexture("collider",1,1)
 	:setPixel(0,0,vec(0,0,0,0))
 local nodeTexture = textures:newTexture("node",1,1)
-	:setPixel(0,0,vec(0,0,1))
+	:setPixel(0,0,vec(0,0.7,1))
 
 
 -- Physbone metatable
@@ -373,6 +373,8 @@ physBone.newCollider = function(self,part)
 	for k,v in pairs(nbtIndex.cube_data) do
 		faces[k] = true
 	end
+	part:setMatrix(matrices.mat4() * 0.15)
+		:setLight(15)
 
 	-- temp code for steph to replace
 
@@ -506,6 +508,7 @@ function physBone.addDebugNodes(part,nodeStart,nodeEnd,nodeRadius,nodeDensity)
 			local node = nodeParent:newPart("node"..i)
 			physBone.newSphere(node,"sphere"..i)
 			node:setMatrix(matrices.mat4():translate(0,-30,4):scale(0.125 * nodeRadius):translate(0,30,-4) * 0.1)
+			node:setLight(15)
 		end
 	end
 end
@@ -524,7 +527,7 @@ function physBone.addDebugParts(part,preset)
 		directionGroup:newSprite("line"..k)
 			:setTexture(whiteTexture,1,1)
 			:setRenderType("EMISSIVE_SOLID")
-			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,math.worldScale,0.5):rotate(0,k*90,0) * 0.12)
+			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,1,0.5):rotate(0,k*90,0) * 0.12)
 	end
 	directionGroup:setScale(1,preset.length,1)
 	directionGroup:setRot(-preset.rotMod)
@@ -598,7 +601,6 @@ events.tick:register(function()
 end,'PHYSBONE.physClock')
 
 -- Render function prep
-local renderFunction = "render"
 local deg = math.deg
 local atan2 = math.atan2
 local asin = math.asin
@@ -610,7 +612,7 @@ local invalidContexts = {
 }
 
 -- Render function
-events[renderFunction]:register(function (delta,context)
+events.RENDER:register(function (delta,context)
 	if(invalidContexts[context] or client:isPaused()) then
 		return
 	end
@@ -627,7 +629,7 @@ events[renderFunction]:register(function (delta,context)
 	for colID,collider in pairs(physBone.collider) do
 		colliderGroups[colID] = {}
 		local colGroup = colliderGroups[colID]
-		local colMatrix = collider.part:partToWorldMatrix()
+		local colMatrix = collider.part:partToWorldMatrix() * (1/0.15)
 		local partPos = colMatrix:apply()
 		local size = collider.size
 		local colTransMat = colMatrix:copy():translate(-partPos)
@@ -703,7 +705,7 @@ events[renderFunction]:register(function (delta,context)
 		local planeNormal
 		local distance
 		for node = 1, curPhysBone.nodeDensity do
-			local nodeLength = curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart
+			local nodeLength = (curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart) / math.worldScale
 			local nodePos = pendulumBase + nodeDir * (nodeLength / 16)
 			for groupID,group in pairs(colliderGroups) do
 				for _,face in pairs(group) do
@@ -718,7 +720,7 @@ events[renderFunction]:register(function (delta,context)
 					local pendulumThickness = 0/worldScale
 					local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
 					local penetration = (distanceZ + pendulumThickness) / size.z
-					local radius = curPhysBone.nodeRadius / 16 / math.worldScale
+					local radius = curPhysBone.nodeRadius / worldScale
 					local isXCollided = (distanceZ - radius) <= 0 and -size.z <= distanceZ
 					local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
 					local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
@@ -733,7 +735,7 @@ events[renderFunction]:register(function (delta,context)
 		end
 
 		-- Finalise physics
-		local nextPos = pendulumBase + direction * (curPhysBone.length / 16)
+		local nextPos = pendulumBase + direction * (curPhysBone.length / 16 / math.worldScale)
 		if not hasCollided then
 			curPhysBone.velocity = nextPos - curPhysBone.pos
 			curPhysBone.pos = nextPos
@@ -780,7 +782,7 @@ events[renderFunction]:register(function (delta,context)
 
 	-- Store deltaTime values
 	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,time
-end,'PHYSBONE.'..renderFunction)
+end,'PHYSBONE.RENDER')
 
 setmetatable(physBone,{__index=physBone.children,__newindex=function(this,key,value)
 	rawget(this,'children')[key]= value
