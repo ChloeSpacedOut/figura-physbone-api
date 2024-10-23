@@ -704,6 +704,7 @@ events.RENDER:register(function (delta,context)
 		local hasCollided = false
 		local planeNormal
 		local distance
+		local colNodePos
 		for node = 1, curPhysBone.nodeDensity do
 			local nodeLength = (curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart) / math.worldScale
 			local nodePos = pendulumBase + nodeDir * (nodeLength / 16)
@@ -729,20 +730,24 @@ events.RENDER:register(function (delta,context)
 						distance = distanceZ - radius
 						hasCollided = true
 						nodeDir = (nodePos - pendulumBase):normalized()
+						colNodePos = nodeLength
 					end
 				end
 			end
 		end
 
 		-- Finalise physics
-		local nextPos = pendulumBase + direction * (curPhysBone.length / 16 / math.worldScale)
+		
 		if not hasCollided then
+			local nextPos = pendulumBase + direction * (curPhysBone.length / 16 / math.worldScale)
 			curPhysBone.velocity = nextPos - curPhysBone.pos
 			curPhysBone.pos = nextPos
 		else
-			local bounce = (curPhysBone.bounce * 2.61)
+			local bounce = curPhysBone.bounce * 2.61
+			local colNextPos = direction * (colNodePos / 16 / math.worldScale) - distance * planeNormal
+			local nextPos = pendulumBase + colNextPos:normalized() * (curPhysBone.length / 16 / math.worldScale)
 			curPhysBone.velocity = (velocity - bounce * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
-			curPhysBone.pos = nextPos - distance * planeNormal
+			curPhysBone.pos = nextPos
 		end
 
 		-- Rotation calcualtion
