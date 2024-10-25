@@ -25,9 +25,6 @@ local physBoneBase = {
 	setRotMod =
 		function(self,data)
 			self.rotMod = data
-			if host:isHost() and self.path.PB_Debug_Direction then
-				self.path.PB_Debug_Direction:setRot(-data)
-			end
 			return self
 		end,
 	getRotMod =
@@ -185,7 +182,6 @@ local physBoneBase = {
 		function(self)
 			return self.nodeRadius
 		end,
-		
 	setBounce =
 		function(self,data)
 			self.bounce = data
@@ -195,12 +191,21 @@ local physBoneBase = {
 		function(self)
 			return self.bounce
 		end,
+	setRollMod =
+		function(self,data)
+			self.rollMod = data
+			return self
+		end,
+	getRollMod =
+		function(self)
+			return self.rollMod
+		end,
 	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
 			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
-			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","length","nodeStart","nodeEnd","nodeDensity","nodeRadius","bounce"} do
+			for k,v in pairs {"rotMod","mass","gravity","airResistance","simSpeed","equilibrium","springForce","force","vecMod","length","nodeStart","nodeEnd","nodeDensity","nodeRadius","bounce","rollMod"} do
 				if preset[v] then
 					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
 					self[funct](self,preset[v])
@@ -231,10 +236,10 @@ local physBoneBase = {
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name)
+physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,rollMod,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name
+		path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,rollMod,id,name = self,path,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,rollMod,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -261,7 +266,8 @@ physBone.newPhysBoneFromValues = function(self,path,rotMod,mass,gravity,airResis
 		nodeEnd = nodeEnd,
 		nodeDensity = nodeDensity,
 		nodeRadius = nodeRadius,
-		bounce = bounce
+		bounce = bounce,
+		rollMod = rollMod
 	},physBoneMT)
 end
 
@@ -301,7 +307,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.length,preset.nodeStart,preset.nodeEnd,preset.nodeDensity,preset.nodeRadius,preset.bounce,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.length,preset.nodeStart,preset.nodeEnd,preset.nodeDensity,preset.nodeRadius,preset.bounce,preset.rollMod,boneID,ID)
 	)
 	if host:isHost() then
 		physBone.addDebugParts(part,preset)
@@ -388,10 +394,10 @@ physBone.newCollider = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce)
+physBone.setPreset = function(self,ID,rotMod,mass,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,length,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,rollMod)
 	local presetCache = {}
-	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, length = length, nodeStart = nodeStart, nodeEnd = nodeEnd, nodeDensity = nodeDensity, nodeRadius = nodeRadius, bounce = bounce}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), length = 16, nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0, bounce = 0.8}
+	local references = {rotMod = rotMod, mass = mass, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, length = length, nodeStart = nodeStart, nodeEnd = nodeEnd, nodeDensity = nodeDensity, nodeRadius = nodeRadius, bounce = bounce, rollMod = roll}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), length = 16, nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0, bounce = 0.8, rollMod = 0}
 	for valID, fallbackVal in pairs(fallbacks) do
 		local presetVal = references[valID]
 		if presetVal then
@@ -493,7 +499,7 @@ function physBone.addDebugNodes(part,nodeStart,nodeEnd,nodeRadius,nodeDensity)
 		for i = 1, nodeDensity do
 			local nodeParent = nodeRadiusGroup:newPart("nodeParent"..i)
 			local nodeLength = nodeEnd * ((nodeEnd - nodeStart) / nodeEnd) * (i  / nodeDensity) + nodeStart
-			nodeParent:setPos(0,0,-nodeLength)
+			nodeParent:setPos(0,-nodeLength,0)
 			local node = nodeParent:newPart("node"..i,"CAMERA")
 			node:newSprite("nodeRadius")
 				:setTexture(nodeTexture,1,1)
@@ -504,7 +510,7 @@ function physBone.addDebugNodes(part,nodeStart,nodeEnd,nodeRadius,nodeDensity)
 		for i = 1, nodeDensity do
 			local nodeParent = nodeRadiusGroup:newPart("nodeParent"..i)
 			local nodeLength = nodeEnd * ((nodeEnd - nodeStart) / nodeEnd) * (i  / nodeDensity) + nodeStart
-			nodeParent:setPos(0,0,-nodeLength)
+			nodeParent:setPos(0,-nodeLength,0)
 			local node = nodeParent:newPart("node"..i)
 			physBone.newSphere(node,"sphere"..i)
 			node:setMatrix(matrices.mat4():translate(0,-30,4):scale(0.125 * nodeRadius):translate(0,30,-4) * 0.1)
@@ -567,6 +573,23 @@ events.entity_init:register(function()
 			for presetID,preset in pairs(physBonePresets) do
 				if ID:sub(0,#presetID) == presetID then
 					physBone.newPhysBone(part,preset)
+					for _,child in pairs(part:getChildren()) do
+						local ID_child = child:getName()
+						local ID_child_sub = ID_child:sub(0,7)
+						if ID_child_sub == "boneEnd" or ID_child_sub == "BoneEnd" then
+							local childPos = child:getPivot() - part:getPivot()
+							local rotModVec = vectors.rotateAroundAxis(90,(childPos):normalized(),vec(-1,0,0))
+							local yaw = math.deg(math.atan2(rotModVec.x,rotModVec.z))
+							local pitch = math.deg(math.asin(-rotModVec.y))
+							local length = childPos:length()
+							physBone[ID]:setRotMod(vec(-pitch,0,-yaw))
+							physBone[ID]:setRollMod(child:getRot().y)
+							physBone[ID]:setLength(length)
+							physBone[ID]:setNodeEnd(length)
+
+						end
+					end
+					
 					part:setRot(0,90,0)
 					break
 				end
@@ -773,8 +796,12 @@ events.RENDER:register(function (delta,context)
 							:translate(pivot)
 
 							:translate(-parentPivot)
-							:rotate(curPhysBone.rotMod)
-							:rotate(0,-90,0)
+						if partID ~= "PB_Debug_Direction" and partID ~= "PB_Debug_NodeRadius" then
+							mat:rotate(vec(0,0,curPhysBone.rotMod.z))
+								:rotate(vec(curPhysBone.rotMod.x,0,0))
+								:rotate(vec(0,curPhysBone.rollMod,0))
+						end
+						mat:rotate(0,-90,0)
 							:rotate(pitch,0,yaw)
 							:translate(parentPivot)
 
