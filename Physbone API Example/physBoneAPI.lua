@@ -119,19 +119,15 @@ local physBoneBase = {
 			return self.springForce
 		end,
 	setEquilibrium =
-		function(self,val1,val2)
-			local data = physBone.getVals(val1,val2)
+		function(self,val1,val2,val3)
+			local data = physBone.getVals(val1,val2,val3)
 			self.equilibrium = data
 			if host:isHost() and self.path.PB_Debug_SpringForce then
 				local springForceGroup = self.path.PB_Debug_SpringForce
-				local pivot = springForceGroup:getPivot()
-				local mat = matrices.mat4()
-				mat:scale(1,self.springForce/50,1)
-					:translate(-pivot)
-					:rotate(0,0,data.x+90)
-					:rotate(0,data.y,0)
-					:translate(pivot)
-				springForceGroup:setMatrix(mat)
+				local equilib = vectors.rotateAroundAxis(90,data,vec(-1,0,0))
+				local pitch,yaw = physBone.vecToRot(equilib)
+				springForceGroup:setRot(pitch,0,yaw)
+					:setScale(1,self.springForce/50,1)
 			end
 			return self
 		end,
