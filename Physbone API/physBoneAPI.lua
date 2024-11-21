@@ -7,6 +7,7 @@ local physBone = {
 	collider = {},
 	index = {},
 }
+
 local physBoneIndex = physBone.index
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
@@ -30,6 +31,23 @@ physBone.getVals = function(val1,val2,val3,val4)
 	end
 end
 
+physBone.vecToRot = function(vec3)
+	vec3 = vec3:copy():normalize()
+	local pitch = math.deg(math.asin(-vec3.y))
+	local yaw = math.deg(math.atan2(vec3.x,vec3.z))
+	return pitch,yaw
+end
+
+physBone.vecToRotMat = function(vec3)
+	local w = vec3:copy():normalize()
+	local u = vec(1,0,0)
+	if math.abs(u:copy():dot(w)) > 0.7 then
+		u = vec(0,1,0)
+	end
+	local v = w:copy():cross(u)
+	u = v:copy():cross(w)
+	return matrices.mat4(vec(u.x,u.y,u.z,0),vec(v.x,v.y,v.z,0),vec(w.x,w.y,w.z,0),vec(0,0,0,1))
+end
 
 -- Physbone metatable
 local physBoneBase = {
@@ -412,7 +430,7 @@ end
 physBone.setPreset = function(self,ID,rotMod,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,vecMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,rollMod)
 	local presetCache = {}
 	local references = {rotMod = rotMod, mass = mass, length = length, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, vecMod = vecMod, nodeStart = nodeStart, nodeEnd = nodeEnd, nodeDensity = nodeDensity, nodeRadius = nodeRadius, bounce = bounce, rollMod = roll}
-	local fallbacks = {rotMod = vec(0,0,0), mass = 1, length = 16, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0, bounce = 0.8, rollMod = 0}
+	local fallbacks = {rotMod = vec(0,0,0), mass = 1, length = 16, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,-1,0), springForce = 0, force = vec(0,0,0), vecMod = vec(1,1,1), nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0, bounce = 0.8, rollMod = 0}
 	for valID, fallbackVal in pairs(fallbacks) do
 		local presetVal = references[valID]
 		if presetVal then
@@ -551,7 +569,6 @@ function physBone.addDebugParts(part,preset)
 			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.5,1,0.5):rotate(0,k*90,0) * 0.12)
 	end
 	directionGroup:setScale(1,preset.length,1)
-	directionGroup:setRot(-preset.rotMod)
 	local springForceGroup = part:newPart("PB_Debug_SpringForce")
 	for k = 0, 3 do
 		springForceGroup:newSprite("line"..k)
@@ -560,14 +577,10 @@ function physBone.addDebugParts(part,preset)
 			:setRenderType("EMISSIVE_SOLID")
 			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.25,3,0.25):rotate(0,k*90,0) * 0.11)
 	end
-	local pivot = springForceGroup:getPivot()
-	local mat = matrices.mat4()
-	mat:translate(-pivot)
-		:scale(1,preset.springForce/50,1)
-		:rotate(0,0,preset.equilibrium.x+90)
-		:rotate(0,preset.equilibrium.y,0)
-		:translate(pivot)
-	springForceGroup:setMatrix(mat)
+	local equilib = vectors.rotateAroundAxis(90,preset.equilibrium,vec(-1,0,0))
+	local pitch,yaw = physBone.vecToRot(equilib)
+	springForceGroup:setRot(pitch,0,yaw)
+		:setScale(1,preset.springForce/50,1)
 
 	physBone.addDebugNodes(part,preset.nodeStart,preset.nodeEnd,preset.nodeRadius,preset.nodeDensity)
 
@@ -594,8 +607,7 @@ events.entity_init:register(function()
 						if ID_child_sub == "boneEnd" or ID_child_sub == "BoneEnd" then
 							local childPos = child:getPivot() - part:getPivot()
 							local rotModVec = vectors.rotateAroundAxis(90,(childPos):normalized(),vec(-1,0,0))
-							local yaw = math.deg(math.atan2(rotModVec.x,rotModVec.z))
-							local pitch = math.deg(math.asin(-rotModVec.y))
+							local pitch,yaw = physBone.vecToRot(rotModVec)
 							local length = childPos:length()
 							physBone[ID]:setRotMod(vec(-pitch,0,-yaw))
 							physBone[ID]:setRollMod(child:getRot().y)
@@ -703,7 +715,6 @@ events.RENDER:register(function (delta,context)
 	for _,curPhysBoneID in pairs(physBoneIndex) do
 		local curPhysBone = physBone[curPhysBoneID]
 		local worldPartMat = curPhysBone.path:partToWorldMatrix()
-		local parentWorldPartMat = curPhysBone.path:getParent():partToWorldMatrix()
 
 		-- Pendulum logic
 		local pendulumBase =  worldPartMat:apply()
@@ -719,10 +730,10 @@ events.RENDER:register(function (delta,context)
 
 		-- Spring force
 		if curPhysBone.springForce ~= 0 then
-			local equalib = curPhysBone.equilibrium
-			local relativeDirMat = parentWorldPartMat:copy() * matrices.mat4():rotate(equalib.y,equalib.x,0)
-			local reliveDir = relativeDirMat:applyDir(0,0,-1):normalized()
-			local springForce = reliveDir * curPhysBone.springForce
+			local equilib = physBone.vecToRotMat(-curPhysBone.equilibrium)
+			local relativeDirMat = worldPartMat:copy() * equilib
+			local relativeDir = relativeDirMat:applyDir(0,0,-1):normalized()
+			local springForce = relativeDir * curPhysBone.springForce
 			velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
 		end
 
@@ -790,8 +801,7 @@ events.RENDER:register(function (delta,context)
 		local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
 		relativeVec = (relativeVec * curPhysBone.vecMod):normalized()
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
-		local yaw = deg(atan2(relativeVec.x,relativeVec.z))
-		local pitch = deg(asin(-relativeVec.y))
+		local pitch,yaw = physBone.vecToRot(relativeVec)
 
 		-- Transform matrix
 		if curPhysBone.path:getVisible() then
