@@ -394,6 +394,7 @@ physBone.newCollider = function(self,part)
 		error("error making collider '"..ID.."'. This cube either has no texture applied to it in Blockbench or has all faces disabled")
 	end
 
+	part:setVisible(true)
 	part:setPrimaryTexture("CUSTOM", colliderTexture)
 
 	local t = nbtIndex.t
