@@ -3,10 +3,14 @@
 local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
 	allowDuplicates = false,
+	-- Diabled debug mode 
+	disableDebugMode = false,
 	children = {},
 	collider = {},
 	index = {},
 }
+
+local doDebugMode = host:isHost() and not physBone.disableDebugMode
 
 local physBoneIndex = physBone.index
 local boneID = 0
@@ -73,7 +77,7 @@ local physBoneBase = {
 	setLength =
 		function(self,data)
 			self.length = data
-			if host:isHost() and self.path.PB_Debug_Direction then
+			if doDebugMode and self.path.PB_Debug_Direction then
 				self.path.PB_Debug_Direction.child:setScale(1,data,1)
 			end
 			return self
@@ -112,6 +116,10 @@ local physBoneBase = {
 	setSpringForce =
 		function(self,data)
 			self.springForce = data
+			if doDebugMode and self.path.PB_Debug_SpringForce then
+				local springForceGroup = self.path.PB_Debug_SpringForce
+				springForceGroup:setScale(1,self.springForce/50,1)
+			end
 			return self
 		end,
 	getSpringForce =
@@ -122,12 +130,11 @@ local physBoneBase = {
 		function(self,val1,val2,val3)
 			local data = physBone.getVals(val1,val2,val3)
 			self.equilibrium = data
-			if host:isHost() and self.path.PB_Debug_SpringForce then
+			if doDebugMode and self.path.PB_Debug_SpringForce then
 				local springForceGroup = self.path.PB_Debug_SpringForce
 				local equilib = vectors.rotateAroundAxis(90,data,vec(-1,0,0))
 				local pitch,yaw = physBone.vecToRot(equilib)
 				springForceGroup:setRot(pitch,0,yaw)
-					:setScale(1,self.springForce/50,1)
 			end
 			return self
 		end,
@@ -158,7 +165,7 @@ local physBoneBase = {
 	setNodeStart =
 		function(self,data)
 			self.nodeStart = data
-			if host:isHost() and self.path.PB_Debug_NodeRadius then
+			if doDebugMode and self.path.PB_Debug_NodeRadius then
 				self.path.PB_Debug_NodeRadius:remove()
 				physBone.addDebugNodes(self.path,data,self.nodeEnd,self.nodeRadius,self.nodeDensity)
 				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
@@ -172,7 +179,7 @@ local physBoneBase = {
 	setNodeEnd =
 		function(self,data)
 			self.nodeEnd = data
-			if host:isHost() and self.path.PB_Debug_NodeRadius then
+			if doDebugMode and self.path.PB_Debug_NodeRadius then
 				self.path.PB_Debug_NodeRadius:remove()
 				physBone.addDebugNodes(self.path,self.nodeStart,data,self.nodeRadius,self.nodeDensity)
 				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
@@ -186,7 +193,7 @@ local physBoneBase = {
 	setNodeDensity =
 		function(self,data)
 			self.nodeDensity = data
-			if host:isHost() and self.path.PB_Debug_NodeRadius then
+			if doDebugMode and self.path.PB_Debug_NodeRadius then
 				self.path.PB_Debug_NodeRadius:remove()
 				physBone.addDebugNodes(self.path,self.nodeStart,self.nodeEnd,self.nodeRadius,data)
 				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
@@ -200,7 +207,7 @@ local physBoneBase = {
 	setNodeRadius =
 		function(self,data)
 			self.nodeRadius = data
-			if host:isHost() and self.path.PB_Debug_NodeRadius then
+			if doDebugMode and self.path.PB_Debug_NodeRadius then
 				self.path.PB_Debug_NodeRadius:remove()
 				physBone.addDebugNodes(self.path,self.nodeStart,self.nodeEnd,data,self.nodeDensity)
 				self.path.PB_Debug_NodeRadius:setVisible(debugMode)
@@ -338,7 +345,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	local p = physBone:addPhysBone(
 		physBone.newPhysBoneFromValues(part,preset.rotMod,preset.mass,preset.length,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.vecMod,preset.nodeStart,preset.nodeEnd,preset.nodeDensity,preset.nodeRadius,preset.bounce,preset.rollMod,boneID,ID)
 	)
-	if host:isHost() then
+	if doDebugMode then
 		physBone.addDebugParts(part,preset)
 	end
 	return p
@@ -449,8 +456,6 @@ physBone:setPreset("physBone")
 physBone:setPreset("PhysBone")
 physBone:setPreset("physBoob",vec(-90,0,0),2,nil,nil,0.5,nil,nil,200)
 physBone:setPreset("PhysBoob",vec(-90,0,0),2,nil,nil,0.5,nil,nil,200)
-physBone:setPreset("physEar",vec(0,180,180),2,nil,nil,0.5,nil,vec(0,90),120)
-physBone:setPreset("PhysEar",vec(0,180,180),2,nil,nil,0.5,nil,vec(0,90),120)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
@@ -597,13 +602,18 @@ events.entity_init:register(function()
 						local ID_child_sub = ID_child:sub(0,7)
 						if ID_child_sub == "boneEnd" or ID_child_sub == "BoneEnd" then
 							local childPos = child:getPivot() - part:getPivot()
-							local rotModVec = vectors.rotateAroundAxis(90,(childPos):normalized(),vec(-1,0,0))
+							local rotModVec = vectors.rotateAroundAxis(90,childPos:normalized(),vec(-1,0,0))
 							local pitch,yaw = physBone.vecToRot(rotModVec)
 							local length = childPos:length()
 							physBone[ID]:setRotMod(vec(-pitch,0,-yaw))
 							physBone[ID]:setRollMod(child:getRot().y)
 							physBone[ID]:setLength(length)
 							physBone[ID]:setNodeEnd(length)
+						elseif ID_child == "equilibrium" or ID_child_sub == "Equilibrium" then
+							local childPos = child:getPivot() - part:getPivot()
+							local equalibVec = vectors.rotateAroundAxis(90,childPos:normalized(),vec(0,-1,0))
+							physBone[ID]:setEquilibrium(equalibVec)
+							physBone[ID]:setSpringForce(child:getRot().y)
 						end
 					end
 					part:setRot(0,90,0)
@@ -618,7 +628,8 @@ end,'PHYSBONE.generateFromModelParts')
 
 -- Debug keybind
 local debugKeybind = keybinds:newKeybind("Toggle PhysBone Debug Mode","key.keyboard.grave.accent")
-function debugKeybind.press()
+function debugKeybind.press(mod)
+	if not (mod == 1) or not doDebugMode then return end
 	debugMode = not debugMode
 	for _,boneID in pairs(physBoneIndex) do
 		physBone[boneID].path.PB_Debug_Pivot:setVisible(debugMode)
