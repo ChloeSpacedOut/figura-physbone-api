@@ -599,8 +599,9 @@ events.entity_init:register(function()
 					physBone.newPhysBone(part,preset)
 					for _,child in pairs(part:getChildren()) do
 						local ID_child = child:getName()
-						local ID_child_sub = ID_child:sub(0,7)
-						if ID_child_sub == "boneEnd" or ID_child_sub == "BoneEnd" then
+						local ID_child_BEsub = ID_child:sub(0,7)
+						local ID_child_EQsub = ID_child:sub(0,11)
+						if ID_child_BEsub == "boneEnd" or ID_child_BEsub == "BoneEnd" then
 							local childPos = child:getPivot() - part:getPivot()
 							local rotModVec = vectors.rotateAroundAxis(90,childPos:normalized(),vec(-1,0,0))
 							local pitch,yaw = physBone.vecToRot(rotModVec)
@@ -609,7 +610,7 @@ events.entity_init:register(function()
 							physBone[ID]:setRollMod(child:getRot().y)
 							physBone[ID]:setLength(length)
 							physBone[ID]:setNodeEnd(length)
-						elseif ID_child == "equilibrium" or ID_child_sub == "Equilibrium" then
+						elseif ID_child_EQsub == "equilibrium" or ID_child_EQsub == "Equilibrium" then
 							local childPos = child:getPivot() - part:getPivot()
 							local equalibVec = vectors.rotateAroundAxis(90,childPos:normalized(),vec(0,-1,0))
 							physBone[ID]:setEquilibrium(equalibVec)
