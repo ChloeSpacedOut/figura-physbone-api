@@ -132,7 +132,8 @@ local physBoneBase = {
 			self.equilibrium = data
 			if doDebugMode and self.path.PB_Debug_SpringForce then
 				local springForceGroup = self.path.PB_Debug_SpringForce
-				local equilib = vectors.rotateAroundAxis(90,data,vec(-1,0,0))
+				local equilib = vectors.rotateAroundAxis(90,data,vec(0,-1,0))
+				equilib = vectors.rotateAroundAxis(90,equilib,vec(-1,0,0))
 				local pitch,yaw = physBone.vecToRot(equilib)
 				springForceGroup:setRot(pitch,0,yaw)
 			end
@@ -455,8 +456,8 @@ end
 -- Default presets
 physBone:setPreset("physBone")
 physBone:setPreset("PhysBone")
-physBone:setPreset("physBoob",vec(-90,0,0),2,nil,nil,0.5,nil,nil,200)
-physBone:setPreset("PhysBoob",vec(-90,0,0),2,nil,nil,0.5,nil,nil,200)
+physBone:setPreset("physBoob",vec(-90,0,0),2,nil,nil,0.5,nil,vec(0,0,-1),200)
+physBone:setPreset("PhysBoob",vec(-90,0,0),2,nil,nil,0.5,nil,vec(0,0,-1),200)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
@@ -574,7 +575,8 @@ function physBone.addDebugParts(part,preset)
 			:setRenderType("EMISSIVE_SOLID")
 			:setMatrix(matrices.mat4():translate(0.5,0,0.5):scale(0.25,3,0.25):rotate(0,k*90,0) * 0.11)
 	end
-	local equilib = vectors.rotateAroundAxis(90,preset.equilibrium,vec(-1,0,0))
+	local equilib = vectors.rotateAroundAxis(90,preset.equilibrium,vec(0,-1,0))
+	equilib = vectors.rotateAroundAxis(90,equilib,vec(-1,0,0))
 	local pitch,yaw = physBone.vecToRot(equilib)
 	springForceGroup:setRot(pitch,0,yaw)
 		:setScale(1,preset.springForce/50,1)
@@ -613,7 +615,7 @@ events.entity_init:register(function()
 							physBone[ID]:setNodeEnd(length)
 						elseif ID_child_SFsub == "springForce" or ID_child_SFsub == "SpringForce" then
 							local childPos = child:getPivot() - part:getPivot()
-							local equalibVec = vectors.rotateAroundAxis(90,childPos:normalized(),vec(0,-1,0))
+							local equalibVec = childPos:normalized()
 							physBone[ID]:setEquilibrium(equalibVec)
 							physBone[ID]:setSpringForce(child:getRot().y)
 						end
@@ -735,7 +737,7 @@ events.RENDER:register(function (delta,context)
 		-- Spring force
 		if curPhysBone.springForce ~= 0 then
 			local equilib = physBone.vecToRotMat(-curPhysBone.equilibrium)
-			local relativeDirMat = worldPartMat:copy() * equilib
+			local relativeDirMat = worldPartMat:copy() * equilib:rotate(0,-90,0)
 			local relativeDir = relativeDirMat:applyDir(0,0,-1):normalized()
 			local springForce = relativeDir * curPhysBone.springForce
 			velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
