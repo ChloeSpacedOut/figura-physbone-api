@@ -417,7 +417,8 @@ physBone.newCollider = function(self,part)
 	for k,v in pairs(nbtIndex.cube_data) do
 		faces[k] = true
 	end
-	part:setMatrix(matrices.mat4() * 0.15)
+	local pivot = part:getPivot()
+	part:setMatrix(matrices.mat4():translate(-pivot):rotate(part:getRot()):translate(pivot) * 0.15)
 		:setLight(15)
 
 	-- temp code for steph to replace
@@ -456,8 +457,8 @@ end
 -- Default presets
 physBone:setPreset("physBone")
 physBone:setPreset("PhysBone")
-physBone:setPreset("physBoob",2,nil,nil,0.5,nil,vec(0,0,-1),200)
-physBone:setPreset("PhysBoob",2,nil,nil,0.5,nil,vec(0,0,-1),200)
+physBone:setPreset("physBoob",2,nil,nil,0.5,nil,vec(0,0,-1),200,nil,vec(-90,0,0),nil,nil,nil,nil,0)
+physBone:setPreset("PhysBoob",2,nil,nil,0.5,nil,vec(0,0,-1),200,nil,vec(-90,0,0),nil,nil,nil,nil,0)
 
 -- models API function: method by GS
 local old_class_index = figuraMetatables.ModelPart.__index
@@ -805,7 +806,7 @@ events.RENDER:register(function (delta,context)
 
 		-- Rotation calcualtion
 		local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
-		relativeVec = (relativeVec * curPhysBone.vecMod):normalized()
+		relativeVec = (relativeVec * curPhysBone.vecMod.zyx):normalized()
 		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
 		local pitch,yaw = physBone.vecToRot(relativeVec)
 
