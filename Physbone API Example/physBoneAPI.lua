@@ -1,5 +1,6 @@
 -- Physbone 2.0 by ChloeSpacedOut <3
 -- Some funny additions made by Superpowers04 :3
+-- Thanks to auria for her help with midRender
 local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
 	allowDuplicates = false,
@@ -15,6 +16,8 @@ local doDebugMode = host:isHost() and not physBone.disableDebugMode
 local physBoneIndex = physBone.index
 local boneID = 0
 local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
+local time,deltaTime = 0,0
+local colliderGroups
 local physBonePresets = {}
 local debugMode = false
 local whiteTexture = textures:newTexture("white",1,1)
@@ -324,6 +327,11 @@ physBone.addPhysBone = function(self,part,index)
 	physBoneIndex[index] = ID
 	part.index = index
 	physBone[ID] = part
+
+	part.path.midRender = function(delta,context)
+		physBone.physBoneRender(delta, context, ID)
+	end
+
 	return part
 end
 
@@ -656,9 +664,6 @@ events.tick:register(function()
 end,'PHYSBONE.physClock')
 
 -- Render function prep
-local deg = math.deg
-local atan2 = math.atan2
-local asin = math.asin
 local zeroVec = vec(0,0,0)
 local invalidContexts = {
 	PAPERDOLL = true,
@@ -666,21 +671,22 @@ local invalidContexts = {
 	FIGURA_GUI = true
 }
 
--- Render function
+-- Global render function
 events.RENDER:register(function (delta,context)
-	if(invalidContexts[context] or client:isPaused()) then
+
+	if invalidContexts[context] or client:isPaused() then
 		return
 	end
 
 	-- Time calculations
-	local time = (physClock + delta)
-	local deltaTime = time - lastDelta
+	time = (physClock + delta)
+	deltaTime = time - lastDelta
 
 	-- If world time / render somehow runs twice, don't run
 	if deltaTime == 0 then return end
 
 	-- Collider setup
-	local colliderGroups = {}
+	colliderGroups = {}
 	for colID,collider in pairs(physBone.collider) do
 		colliderGroups[colID] = {}
 		local colGroup = colliderGroups[colID]
@@ -718,136 +724,141 @@ events.RENDER:register(function (delta,context)
 			colGroup.d = {pos = colPos, normals = {-colNormalX,colNormalZ,-colNormalY}, size = vec(size.x,size.z,size.y)}
 		end
 	end
+end,'PHYSBONE.RENDER')
 
-	for _,curPhysBoneID in pairs(physBoneIndex) do
-		local curPhysBone = physBone[curPhysBoneID]
-		local worldPartMat = curPhysBone.path:partToWorldMatrix()
+function physBone.physBoneRender(delta, context, curPhysBoneID)
+	if client:isPaused() then
+		return
+	end	
 
-		-- Pendulum logic
-		local pendulumBase =  worldPartMat:apply()
-		if pendulumBase.x ~= pendulumBase.x then return end -- avoid physics breaking if partToWorldMatrix returns NaN
-		local velocity = curPhysBone.velocity / lastestDeltaTime / ((curPhysBone.simSpeed * curPhysBone.mass)/100)
+	local curPhysBone = physBone[curPhysBoneID]
+	local worldPartMat = curPhysBone.path:partToWorldMatrix()
 
-		-- Air resistance
-		local airResistanceFactor = curPhysBone.airResistance
-		if airResistanceFactor ~= 0 then
-			local airResistance = velocity * (-airResistanceFactor)
-			velocity = velocity + airResistance * lasterDeltaTime / curPhysBone.mass
+	-- Pendulum logic
+	local pendulumBase =  worldPartMat:apply()
+	if pendulumBase.x ~= pendulumBase.x then return end -- avoid physics breaking if partToWorldMatrix returns NaN
+	local velocity = curPhysBone.velocity / lastestDeltaTime / ((curPhysBone.simSpeed * curPhysBone.mass)/100)
+
+	-- Air resistance
+	local airResistanceFactor = curPhysBone.airResistance
+	if airResistanceFactor ~= 0 then
+		local airResistance = velocity * (-airResistanceFactor)
+		velocity = velocity + airResistance * lasterDeltaTime / curPhysBone.mass
+	end
+
+	-- Spring force
+	if curPhysBone.springForce ~= 0 then
+		local equilib = physBone.vecToRotMat(-curPhysBone.equilibrium)
+		local relativeDirMat = worldPartMat:copy() * equilib:rotate(0,-90,0)
+		local relativeDir = relativeDirMat:applyDir(0,0,-1):normalized()
+		local springForce = relativeDir * curPhysBone.springForce
+		velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
 		end
 
-		-- Spring force
-		if curPhysBone.springForce ~= 0 then
-			local equilib = physBone.vecToRotMat(-curPhysBone.equilibrium)
-			local relativeDirMat = worldPartMat:copy() * equilib:rotate(0,-90,0)
-			local relativeDir = relativeDirMat:applyDir(0,0,-1):normalized()
-			local springForce = relativeDir * curPhysBone.springForce
-			velocity = velocity + springForce * lasterDeltaTime / curPhysBone.mass^2
-		end
+	-- Custom force
+	if curPhysBone.force ~= zeroVec then
+		velocity = velocity + curPhysBone.force * lasterDeltaTime / curPhysBone.mass^2
+	end
 
-		-- Custom force
-		if curPhysBone.force ~= zeroVec then
-			velocity = velocity + curPhysBone.force * lasterDeltaTime / curPhysBone.mass^2
-		end
+	-- Gravity
+	velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime / curPhysBone.mass
 
-		-- Gravity
-		velocity = velocity + vec(0, curPhysBone.gravity,0) * lasterDeltaTime / curPhysBone.mass
-
-		-- Collisions
-		local direction = ((curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase):normalized()
-		local nodeDir = direction
-		local hasCollided = false
-		local planeNormal
-		local distance
-		local colNodePos
-		for node = 1, curPhysBone.nodeDensity do
-			local nodeLength = (curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart) / math.worldScale
-			local nodePos = pendulumBase + nodeDir * (nodeLength / 16)
-			for groupID,group in pairs(colliderGroups) do
-				for _,face in pairs(group) do
-					local normalX = face.normals[1]
-					local normalY = face.normals[2]
-					local normalZ = face.normals[3]
-					local diff = nodePos - face.pos
-					local distanceX = diff:dot(normalX) / normalX:length()
-					local distanceY = diff:dot(normalY) / normalY:length()
-					local distanceZ = diff:dot(normalZ) / normalZ:length()
-					local worldScale = 16*math.worldScale
-					local pendulumThickness = 0/worldScale
-					local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
-					local penetration = (distanceZ + pendulumThickness) / size.z
-					local radius = curPhysBone.nodeRadius / worldScale
-					local isXCollided = (distanceZ - radius) <= 0 and -size.z <= distanceZ
-					local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
-					local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
-					if isXCollided and isYCollided and isZCollided then
-						planeNormal = normalZ
-						distance = distanceZ - radius
-						hasCollided = true
-						nodeDir = (nodePos - pendulumBase):normalized()
-						colNodePos = nodeLength
-					end
-				end
-			end
-		end
-
-		-- Finalise physics
-		
-		if not hasCollided then
-			local nextPos = pendulumBase + direction * (curPhysBone.length / 16 / math.worldScale)
-			curPhysBone.velocity = nextPos - curPhysBone.pos
-			curPhysBone.pos = nextPos
-		else
-			local bounce = curPhysBone.bounce * 2.61
-			local colNextPos = direction * (colNodePos / 16 / math.worldScale) - distance * planeNormal
-			local nextPos = pendulumBase + colNextPos:normalized() * (curPhysBone.length / 16 / math.worldScale)
-			curPhysBone.velocity = (velocity - bounce * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
-			curPhysBone.pos = nextPos
-		end
-
-		-- Rotation calcualtion
-		local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
-		relativeVec = (relativeVec * curPhysBone.vecMod.zyx):normalized()
-		relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
-		local pitch,yaw = physBone.vecToRot(relativeVec)
-
-		-- Transform matrix
-		if curPhysBone.path:getVisible() then
-			local parentPivot = curPhysBone.path:getPivot()
-			for _,part in pairs(curPhysBone.path:getChildren()) do
-				if part:getVisible() then
-					local partID = part:getName()
-					if partID ~= "PB_Debug_Pivot" and partID ~= "PB_Debug_SpringForce" then
-						local pivot = part:getPivot()
-						local mat = matrices.mat4()
-						local rot = part:getRot()
-
-						mat:translate(-pivot)
-							:rotate(rot.x,rot.y,rot.z)
-							:translate(pivot)
-
-							:translate(-parentPivot)
-						if partID ~= "PB_Debug_Direction" and partID ~= "PB_Debug_NodeRadius" then
-							mat:rotate(vec(0,0,curPhysBone.rotMod.z))
-								:rotate(vec(0,curPhysBone.rotMod.y,0))
-								:rotate(vec(curPhysBone.rotMod.x,0,0))
-								:rotate(vec(0,curPhysBone.rollMod,0))
-						end
-						mat:rotate(0,-90,0)
-							:rotate(pitch,0,yaw)
-							:translate(parentPivot)
-
-						part:setMatrix(mat)
-					end
+	-- Collisions
+	local direction = ((curPhysBone.pos + velocity * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)) - pendulumBase):normalized()
+	local nodeDir = direction
+	local hasCollided = false
+	local planeNormal
+	local distance
+	local colNodePos
+	for node = 1, curPhysBone.nodeDensity do
+		local nodeLength = (curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart) / math.worldScale
+		local nodePos = pendulumBase + nodeDir * (nodeLength / 16)
+		for groupID,group in pairs(colliderGroups) do
+			for _,face in pairs(group) do
+				local normalX = face.normals[1]
+				local normalY = face.normals[2]
+				local normalZ = face.normals[3]
+				local diff = nodePos - face.pos
+				local distanceX = diff:dot(normalX) / normalX:length()
+				local distanceY = diff:dot(normalY) / normalY:length()
+				local distanceZ = diff:dot(normalZ) / normalZ:length()
+				local worldScale = 16*math.worldScale
+				local pendulumThickness = 0/worldScale
+				local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
+				local penetration = (distanceZ + pendulumThickness) / size.z
+				local radius = curPhysBone.nodeRadius / worldScale
+				local isXCollided = (distanceZ - radius) <= 0 and -size.z <= distanceZ
+				local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
+				local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
+				if isXCollided and isYCollided and isZCollided then
+					planeNormal = normalZ
+					distance = distanceZ - radius
+					hasCollided = true
+					nodeDir = (nodePos - pendulumBase):normalized()
+					colNodePos = nodeLength
 				end
 			end
 		end
 	end
 
-	-- Store deltaTime values
-	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,time
-end,'PHYSBONE.RENDER')
+	-- Finalise physics
 
-setmetatable(physBone,{__index=physBone.children,__newindex=function(this,key,value)
-	rawget(this,'children')[key]= value
+	if not hasCollided then
+		local nextPos = pendulumBase + direction * (curPhysBone.length / 16 / math.worldScale)
+		curPhysBone.velocity = nextPos - curPhysBone.pos
+		curPhysBone.pos = nextPos
+	else
+		local bounce = curPhysBone.bounce * 2.61
+		local colNextPos = direction * (colNodePos / 16 / math.worldScale) - distance * planeNormal
+		local nextPos = pendulumBase + colNextPos:normalized() * (curPhysBone.length / 16 / math.worldScale)
+		curPhysBone.velocity = (velocity - bounce * velocity:dot(planeNormal) * planeNormal) * lasterDeltaTime * ((curPhysBone.simSpeed * curPhysBone.mass)/100)
+		curPhysBone.pos = nextPos
+	end
+
+	-- Rotation calcualtion
+	local relativeVec = (worldPartMat:copy()):invert():apply(pendulumBase + (curPhysBone.pos - pendulumBase)):normalize()
+	relativeVec = (relativeVec * curPhysBone.vecMod.zyx):normalized()
+	relativeVec = vectors.rotateAroundAxis(90,relativeVec,vec(-1,0,0))
+	local pitch,yaw = physBone.vecToRot(relativeVec)
+
+	-- Transform matrix
+	if curPhysBone.path:getVisible() then
+		local parentPivot = curPhysBone.path:getPivot()
+		for _,part in pairs(curPhysBone.path:getChildren()) do
+			if part:getVisible() then
+				local partID = part:getName()
+				if partID ~= "PB_Debug_Pivot" and partID ~= "PB_Debug_SpringForce" then
+					local pivot = part:getPivot()
+					local mat = matrices.mat4()
+					local rot = part:getRot()
+
+					mat:translate(-pivot)
+						:rotate(rot.x,rot.y,rot.z)
+						:translate(pivot)
+
+						:translate(-parentPivot)
+					if partID ~= "PB_Debug_Direction" and partID ~= "PB_Debug_NodeRadius" then
+						mat:rotate(vec(0,0,curPhysBone.rotMod.z))
+							:rotate(vec(0,curPhysBone.rotMod.y,0))
+							:rotate(vec(curPhysBone.rotMod.x,0,0))
+							:rotate(vec(0,curPhysBone.rollMod,0))
+					end
+					mat:rotate(0,-90,0)
+						:rotate(pitch,0,yaw)
+						:translate(parentPivot)
+
+					part:setMatrix(mat)
+				end
+			end
+		end
+	end
+end
+
+events.POST_RENDER:register(function()
+	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,time
+end)
+
+setmetatable(physBone,{__index = physBone.children,__newindex = function(this,key,value)
+	rawget(this,'children')[key] = value
 end})
 return physBone

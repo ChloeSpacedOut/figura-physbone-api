@@ -15,4 +15,8 @@ function events.entity_init()
   physBone.physBoneRope2:setNodeDensity(0)
   physBone.physBoneRope3:setNodeDensity(0)
   physBone.physBoneRope4:setNodeDensity(0)
+  physBone.physBoneRope5:setNodeDensity(0)
+  physBone.physBoneRope6:setNodeDensity(0)
+  physBone.physBoneRope7:setNodeDensity(0)
+  physBone.physBoneRope8:setNodeDensity(0)
 end
