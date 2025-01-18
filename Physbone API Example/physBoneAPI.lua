@@ -854,7 +854,13 @@ function physBone.physBoneRender(delta, context, curPhysBoneID)
 	end
 end
 
-events.POST_RENDER:register(function()
+events.POST_RENDER:register(function(delta, context)
+	if invalidContexts[context] or client:isPaused() then
+		return
+	end
+
+	-- If world time / render somehow runs twice, don't run
+	if deltaTime == 0 then return end
 	lastestDeltaTime,lasterDeltaTime,lastDeltaTime,lastDelta = lasterDeltaTime,lastDeltaTime,deltaTime,time
 end)
 
