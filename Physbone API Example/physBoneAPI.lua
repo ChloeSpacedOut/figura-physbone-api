@@ -1,4 +1,4 @@
--- Physbone 2.1 by ChloeSpacedOut <3
+-- Physbone 2.2 by ChloeSpacedOut <3
 -- Some funny additions made by Superpowers04 :3
 -- Thanks to auria for her help with midRender
 local physBone = {
@@ -727,7 +727,7 @@ events.RENDER:register(function (delta,context)
 end,'PHYSBONE.RENDER')
 
 function physBone.physBoneRender(delta, context, curPhysBoneID)
-	if client:isPaused() then
+	if client:isPaused() or (colliderGroups == nil) then
 		return
 	end	
 
