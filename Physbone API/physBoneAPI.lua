@@ -240,6 +240,22 @@ local physBoneBase = {
 		function(self)
 			return self.bounce
 		end,
+	blacklistCollider = 
+		function(self,collider)
+			assert(physBone.collider[collider],"Collider does not exist")
+			self.colliderBlacklist[collider] = true
+			return self
+		end,
+	unBlacklistCollider = 
+		function(self,collider)
+			assert(physBone.collider[collider],"Collider does not exist")
+			self.colliderBlacklist[collider] = nil
+			return self
+		end,
+	getColliderBlacklist = 
+		function(self)
+			return self.colliderBlacklist
+		end,
 	updateWithPreset = 
 		function(self,presetID)
 			assert(presetID,'error making physBone: your preset can not be nil')
@@ -292,6 +308,7 @@ physBone.newPhysBoneFromValues = function(self,path,mass,length,gravity,airResis
 		path = path,
 		pos = pos,
 		velocity = velocity,
+		colliderBlacklist = {},
 		mass = mass,
 		length = length,
 		gravity = gravity,
@@ -774,28 +791,30 @@ function physBone.physBoneRender(delta, context, curPhysBoneID)
 		local nodeLength = (curPhysBone.nodeEnd * ((curPhysBone.nodeEnd - curPhysBone.nodeStart) / curPhysBone.nodeEnd) * (node  / curPhysBone.nodeDensity) + curPhysBone.nodeStart) / math.worldScale
 		local nodePos = pendulumBase + nodeDir * (nodeLength / 16)
 		for groupID,group in pairs(colliderGroups) do
-			for _,face in pairs(group) do
-				local normalX = face.normals[1]
-				local normalY = face.normals[2]
-				local normalZ = face.normals[3]
-				local diff = nodePos - face.pos
-				local distanceX = diff:dot(normalX) / normalX:length()
-				local distanceY = diff:dot(normalY) / normalY:length()
-				local distanceZ = diff:dot(normalZ) / normalZ:length()
-				local worldScale = 16*math.worldScale
-				local pendulumThickness = 0/worldScale
-				local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
-				local penetration = (distanceZ + pendulumThickness) / size.z
-				local radius = curPhysBone.nodeRadius / worldScale
-				local isXCollided = (distanceZ - radius) <= 0 and -size.z <= distanceZ
-				local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
-				local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
-				if isXCollided and isYCollided and isZCollided then
-					planeNormal = normalZ
-					distance = distanceZ - radius
-					hasCollided = true
-					nodeDir = (nodePos - pendulumBase):normalized()
-					colNodePos = nodeLength
+			if not curPhysBone.colliderBlacklist[groupID] then
+				for _,face in pairs(group) do
+					local normalX = face.normals[1]
+					local normalY = face.normals[2]
+					local normalZ = face.normals[3]
+					local diff = nodePos - face.pos
+					local distanceX = diff:dot(normalX) / normalX:length()
+					local distanceY = diff:dot(normalY) / normalY:length()
+					local distanceZ = diff:dot(normalZ) / normalZ:length()
+					local worldScale = 16*math.worldScale
+					local pendulumThickness = 0/worldScale
+					local size = vec(face.size.x,face.size.y,face.size.z) / worldScale
+					local penetration = (distanceZ + pendulumThickness) / size.z
+					local radius = curPhysBone.nodeRadius / worldScale
+					local isXCollided = (distanceZ - radius) <= 0 and -size.z <= distanceZ
+					local isYCollided = distanceY <= penetration * size.y and (penetration * -size.y) - size.y <= distanceY and penetration >= -0.5
+					local isZCollided = distanceX <= penetration * size.x and (penetration * -size.x) - size.x <= distanceX and penetration >= -0.5
+					if isXCollided and isYCollided and isZCollided then
+						planeNormal = normalZ
+						distance = distanceZ - radius
+						hasCollided = true
+						nodeDir = (nodePos - pendulumBase):normalized()
+						colNodePos = nodeLength
+					end
 				end
 			end
 		end
