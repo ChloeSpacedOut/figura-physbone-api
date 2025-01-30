@@ -19,4 +19,5 @@ function events.entity_init()
   physBone.physBoneRope6:setNodeDensity(0)
   physBone.physBoneRope7:setNodeDensity(0)
   physBone.physBoneRope8:setNodeDensity(0)
+  log(models.model.Body.physBoob:getPhysBone())
 end

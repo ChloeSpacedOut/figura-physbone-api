@@ -383,7 +383,7 @@ physBone.getPhysBone = function(self,part)
 		part = self
 	end
 	assert(part,'cannot get physBone: part is null!')
-	local ID = self:getName()
+	local ID = part:getName()
 	assert(physBone[ID],('cannot get physBone: this part does not have a physBone'))
 	return physBone[ID]
 end
