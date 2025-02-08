@@ -19,6 +19,7 @@ local lastDeltaTime,lasterDeltaTime,lastestDeltaTime,lastDelta = 1,1,1,1
 local time,deltaTime = 0,0
 local colliderGroups
 local physBonePresets = {}
+local renderedPhysBones
 local debugMode = false
 local whiteTexture = textures:newTexture("white",1,1)
 	:setPixel(0,0,vec(1,1,1))
@@ -445,6 +446,7 @@ physBone.newCollider = function(self,part)
 	local pivot = part:getPivot()
 	part:setMatrix(matrices.mat4():translate(-pivot):rotate(part:getRot()):translate(pivot) * 0.15)
 		:setLight(15)
+		:setSecondaryRenderType("NONE")
 
 	-- temp code for steph to replace
 
@@ -694,6 +696,8 @@ events.RENDER:register(function (delta,context)
 	if invalidContexts[context] or client:isPaused() then
 		return
 	end
+	
+	renderedPhysBones = {}
 
 	-- Time calculations
 	time = (physClock + delta)
@@ -744,9 +748,10 @@ events.RENDER:register(function (delta,context)
 end,'PHYSBONE.RENDER')
 
 function physBone.physBoneRender(delta, context, curPhysBoneID)
-	if client:isPaused() or (colliderGroups == nil) then
+	if client:isPaused() or (colliderGroups == nil) or renderedPhysBones[curPhysBoneID] then
 		return
 	end	
+	renderedPhysBones[curPhysBoneID] = true
 
 	local curPhysBone = physBone[curPhysBoneID]
 	local worldPartMat = curPhysBone.path:partToWorldMatrix()
