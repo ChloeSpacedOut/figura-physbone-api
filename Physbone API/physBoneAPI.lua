@@ -1,4 +1,4 @@
--- Physbone 2.2 by ChloeSpacedOut <3
+-- Physbone 2.3 by ChloeSpacedOut <3
 -- Some funny additions made by Superpowers04 :3
 -- Thanks to auria for her help with midRender
 local physBone = {
