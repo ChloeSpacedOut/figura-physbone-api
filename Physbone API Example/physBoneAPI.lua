@@ -4,8 +4,10 @@
 local physBone = {
 	-- DO NOT ENABLE THIS UNLESS YOU KNOW WHAT YOU'RE DOING, THIS APPENDS THE INDEX OF THE PHYSBONE TO IT'S NAME IF THERE'S A DUPLICATE AND CAN CAUSE ISSUES
 	allowDuplicates = false,
-	-- Diabled debug mode 
+	-- Diables debug mode 
 	disableDebugMode = false,
+	-- Disables scanning through model parts for blockbench keywords. Saves on INIT performance
+	disablePhysBoneScanner = false,
 	children = {},
 	collider = {},
 	index = {},
@@ -241,6 +243,11 @@ local physBoneBase = {
 		function(self)
 			return self.bounce
 		end,
+	doPhysics =
+		function(self,data)
+			self.doPhysics = data
+			return self
+		end,
 	blacklistCollider = 
 		function(self,collider)
 			assert(physBone.collider[collider],"Collider does not exist")
@@ -262,7 +269,7 @@ local physBoneBase = {
 			assert(presetID,'error making physBone: your preset can not be nil')
 			local preset = type(presetID) == "table" and presetID or physBonePresets[presetID]
 			assert(preset,'error making physBone: preset "'..tostring(presetID)..'" does not exist')
-			for k,v in pairs {"mass","length","gravity","airResistance","simSpeed","equilibrium","springForce","force","rotMod","vecMod","rollMod","nodeStart","nodeEnd","nodeDensity","nodeRadius","bounce"} do
+			for k,v in pairs {"mass","length","gravity","airResistance","simSpeed","equilibrium","springForce","force","rotMod","vecMod","rollMod","nodeStart","nodeEnd","nodeDensity","nodeRadius","bounce","doPhysics"} do
 				if preset[v] then
 					local funct = "set"..string.upper(string.sub(v,0,1))..string.sub(v,2,-1)
 					self[funct](self,preset[v])
@@ -293,10 +300,10 @@ local physBoneBase = {
 local physBoneMT = {__index=physBoneBase}
 
 -- Internal Function: Returns physbone metatable from set values
-physBone.newPhysBoneFromValues = function(self,path,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name)
+physBone.newPhysBoneFromValues = function(self,path,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,doPhysics,id,name)
 	if(self ~= physBone) then
 		-- Literally just offsets everything so self is used as the base 
-		path,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name = self,path,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,id,name
+		path,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,doPhysics,id,name = self,path,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,doPhysics,id,name
 	end
 	assert(user:isLoaded(),'error making physBone: attempt to create part before entity init')
 	assert(path,'error making physBone: part is null!')
@@ -325,7 +332,8 @@ physBone.newPhysBoneFromValues = function(self,path,mass,length,gravity,airResis
 		nodeEnd = nodeEnd,
 		nodeDensity = nodeDensity,
 		nodeRadius = nodeRadius,
-		bounce = bounce
+		bounce = bounce,
+		doPhysics = doPhysics
 	},physBoneMT)
 end
 
@@ -370,7 +378,7 @@ physBone.newPhysBone = function(self,part,physBonePreset)
 	assert(preset,'error making physBone: preset "'..tostring(physBonePreset)..'" does not exist')
 	part:setRot(0,90,0)
 	local p = physBone:addPhysBone(
-		physBone.newPhysBoneFromValues(part,preset.mass,preset.length,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.rotMod,preset.vecMod,preset.rollMod,preset.nodeStart,preset.nodeEnd,preset.nodeDensity,preset.nodeRadius,preset.bounce,boneID,ID)
+		physBone.newPhysBoneFromValues(part,preset.mass,preset.length,preset.gravity,preset.airResistance,preset.simSpeed,preset.equilibrium,preset.springForce,preset.force,preset.rotMod,preset.vecMod,preset.rollMod,preset.nodeStart,preset.nodeEnd,preset.nodeDensity,preset.nodeRadius,preset.bounce,preset.doPhysics,boneID,ID)
 	)
 	if doDebugMode then
 		physBone.addDebugParts(part,preset)
@@ -385,8 +393,19 @@ physBone.getPhysBone = function(self,part)
 	end
 	assert(part,'cannot get physBone: part is null!')
 	local ID = part:getName()
-	assert(physBone[ID],('cannot get physBone: this part does not have a physBone'))
+	assert(physBone[ID],'cannot get physBone: this part does not have a physBone')
 	return physBone[ID]
+end
+
+-- Returns your collider
+physBone.getCollider = function(self,part)
+	if self ~= physBone then
+		part = self
+	end
+	assert(part,'cannot get collider: part is null!')
+	local ID = part:getName()
+	assert(physBone.collider[ID],'cannot get collider: this part does not have a collider')
+	return physBone.collider[ID]
 end
 
 -- Internal function to get part parents
@@ -460,10 +479,10 @@ physBone.newCollider = function(self,part)
 end
 
 -- Creates a new or sets the value of an existing preset
-physBone.setPreset = function(self,ID,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce)
+physBone.setPreset = function(self,ID,mass,length,gravity,airResistance,simSpeed,equilibrium,springForce,force,rotMod,vecMod,rollMod,nodeStart,nodeEnd,nodeDensity,nodeRadius,bounce,doPhysics)
 	local presetCache = {}
-	local references = {mass = mass, length = length, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, rotMod = rotMod, vecMod = vecMod, rollMod = rollMod, nodeStart = nodeStart, nodeEnd = nodeEnd, nodeDensity = nodeDensity, nodeRadius = nodeRadius, bounce = bounce}
-	local fallbacks = {mass = 1, length = 16, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,-1,0), springForce = 0, force = vec(0,0,0), rotMod = vec(0,0,0), vecMod = vec(1,1,1), rollMod = 0, nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0, bounce = 0.75}
+	local references = {mass = mass, length = length, gravity = gravity, airResistance = airResistance, simSpeed = simSpeed, equilibrium = equilibrium, springForce = springForce, force = force, rotMod = rotMod, vecMod = vecMod, rollMod = rollMod, nodeStart = nodeStart, nodeEnd = nodeEnd, nodeDensity = nodeDensity, nodeRadius = nodeRadius, bounce = bounce, doPhysics = doPhysics}
+	local fallbacks = {mass = 1, length = 16, gravity = -9.81, airResistance = 0.1, simSpeed = 1, equilibrium = vec(0,-1,0), springForce = 0, force = vec(0,0,0), rotMod = vec(0,0,0), vecMod = vec(1,1,1), rollMod = 0, nodeStart = 0, nodeEnd = 16, nodeDensity = 1, nodeRadius = 0, bounce = 0.75, doPhysics = true}
 	for valID, fallbackVal in pairs(fallbacks) do
 		local presetVal = references[valID]
 		if presetVal then
@@ -496,6 +515,9 @@ local class_methods = {
 	getPhysBone = function(self)
 		return physBone:getPhysBone(self)
 
+	end,
+	newCollider = function(self)
+		return physBone:newCollider(self)
 	end
 }
 
@@ -618,6 +640,7 @@ end
 
 -- Generate physBones and colliders from model parts
 events.entity_init:register(function()
+	if physBone.disablePhysBoneScanner then return end
 	local function findCustomParentTypes(path)
 		for _,part in pairs(path:getChildren()) do
 			local ID = part:getName()
@@ -659,9 +682,9 @@ events.entity_init:register(function()
 end,'PHYSBONE.generateFromModelParts')
 
 -- Debug keybind
-local debugKeybind = keybinds:newKeybind("Toggle PhysBone Debug Mode","key.keyboard.grave.accent")
+local debugKeybind = keybinds:newKeybind("Toggle PhysBone Debug Mode","key.keyboard.d")
 function debugKeybind.press(mod)
-	if not (mod == 1) or not doDebugMode then return end
+	if not (mod == 2) or not doDebugMode then return end
 	debugMode = not debugMode
 	for _,boneID in pairs(physBoneIndex) do
 		physBone[boneID].path.PB_Debug_Pivot:setVisible(debugMode)
@@ -674,6 +697,7 @@ function debugKeybind.press(mod)
 	else
 		colliderTexture:setPixel(0,0,vec(0,0,0,0)):update()
 	end
+	return true
 end
 
 -- Simple clock
@@ -748,7 +772,7 @@ events.RENDER:register(function (delta,context)
 end,'PHYSBONE.RENDER')
 
 function physBone.physBoneRender(delta, context, curPhysBoneID)
-	if client:isPaused() or (colliderGroups == nil) or renderedPhysBones[curPhysBoneID] then
+	if client:isPaused() or (colliderGroups == nil) or renderedPhysBones[curPhysBoneID] or (not physBone[curPhysBoneID].doPhysics) then
 		return
 	end	
 	renderedPhysBones[curPhysBoneID] = true
